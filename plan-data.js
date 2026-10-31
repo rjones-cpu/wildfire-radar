@@ -80,7 +80,7 @@ window.WILDFIRE_PLAN = {
     {
       id: "alert",
       name: "Alert",
-      rangeLabel: "100 km or greater (within monitoring range)",
+      rangeLabel: "100 to 150 km (monitor radius)",
       maxKm: Infinity,
       minKm: 100,
       severity: 0,
@@ -460,7 +460,7 @@ window.computeWhzLevel = function (nearestKm, monitorRadiusKm) {
       nearestKm: null
     };
   }
-  // Severity order: Level 3 (<25), Level 2 (25–50), Level 1 (50–100), Alert (>=100 within monitor)
+  // Severity order: Level 3 (<=25), Level 2 (>25–50), Level 1 (>50–100), Alert (>100–monitor radius)
   const levels = plan.whzLevels;
   let match = null;
   if (nearestKm <= 25) match = levels.find((l) => l.id === "level3");

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://geospatial.alberta.ca https://services6.arcgis.com; frame-src https://embed.windy.com; worker-src 'none'; form-action 'none'" />
   <title>LodgeX Wildfire Preparedness · Radar</title>
   <style>
     :root {
@@ -485,6 +486,7 @@
           title="Windy wind overlay (background)"
           loading="lazy"
           referrerpolicy="no-referrer-when-downgrade"
+          sandbox="allow-scripts"
           allowfullscreen
           src="https://embed.windy.com/embed2.html?lat=53.42&lon=-117.50&detailLat=53.42&detailLon=-117.50&zoom=7&level=surface&overlay=wind&product=ecmwf&menu=&message=false&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1"
         ></iframe>
@@ -574,6 +576,7 @@
     · Prototype / local only · Plan embedded from site-specific doc · Auto-refresh every 5 minutes
   </footer>
 
+  <script src="radar-security.js"></script>
   <script src="plan-data.js"></script>
   <script>
 (function () {
@@ -583,7 +586,7 @@
   const API_BC =
     "https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0/query" +
     "?where=" + encodeURIComponent("FIRE_STATUS <> 'Out'") +
-    "&outFields=FIRE_NUMBER,FIRE_STATUS,CURRENT_SIZE,LATITUDE,LONGITUDE,INCIDENT_NAME,GEOGRAPHIC_DESCRIPTION" +
+    "&outFields=FIRE_NUMBER,FIRE_STATUS,CURRENT_SIZE,LATITUDE,LONGITUDE,INCIDENT_NAME" +
     "&returnGeometry=true&outSR=4326&f=geojson&resultRecordCount=2000";
   const RADIUS_KM = 150;
   const RINGS = [25, 50, 100, 150];
@@ -782,7 +785,7 @@
     ).join("");
 
     el.routesBlock.innerHTML = PLAN.evacuationRoutes.map((r) =>
-      "<div class='route-card'><h3><span class='swatch' style='background:" + r.color + "'></span>" +
+      "<div class='route-card'><h3><span class='swatch' style='background:" + safeRouteColor(r.color) + "'></span>" +
       escapeHtml(r.name) + "</h3>" +
       "<div class='meta-line'>Destination: " + escapeHtml(r.destination) +
       " · Radio: " + escapeHtml(r.radio) + "</div>" +
@@ -972,12 +975,10 @@
     });
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  const escapeHtml = window.escapeHtml;
+  const safeRouteColor = window.safeRouteColor;
+  if (typeof escapeHtml !== "function" || typeof safeRouteColor !== "function") {
+    console.error("radar-security.js missing");
   }
 
   function coordsFromFeature(ft, p) {

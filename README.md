@@ -26,6 +26,12 @@ Each ping is tagged **AB** or **BC**. Feeds load in parallel; one failure keeps 
 
 Extracted into `plan-data.js` from `/workspace/wildfire-preparedness/site-specific-plan.docx` (+ pptx context).
 
+## Tests
+
+```bash
+node test/whz-escape.test.js
+```
+
 ## Docs
 
 - `DESIGN.md` — nine agent functions  

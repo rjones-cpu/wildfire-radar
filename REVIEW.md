@@ -8,7 +8,9 @@
 
 | Path | Change |
 |------|--------|
-| `index.html` | Dual AB+BC feeds; WHZ UI; plan tabs; **Windy free embed** wind background behind radar; Contacts shows ICS **response-chart** role duties |
+| `index.html` | Dual AB+BC feeds; WHZ UI; plan tabs; Windy embed (`sandbox=allow-scripts`); CSP meta; Contacts ICS response chart |
+| `radar-security.js` | `escapeHtml` (incl. `'`) + route colour hex allowlist |
+| `test/whz-escape.test.js` | Plain Node tests for WHZ edges + escape/allowlist |
 | `plan-data.js` | Plan knowledge + `computeWhzLevel` + **responseChartRoles** (verbatim docx) + reworded gaps |
 | `DESIGN.md` | Nine agent functions (dual feed + Windy) |
 | `REVIEW.md` | This summary |
@@ -27,7 +29,9 @@
 ## Windy wind background
 
 - Free `embed.windy.com/embed2.html` with `overlay=wind`, centered on camp pin; canvas rings/fires remain on top (`pointer-events: none` on iframe).
+- iframe `sandbox="allow-scripts"` only (**no** `allow-same-origin`).
 - **No Windy Map Forecast API key** required or used.
+- **Third-party console noise:** Windy’s embed may log CORS / cross-origin warnings in the browser console for its own tile or analytics subrequests. That is third-party noise, not an app connect-src violation for our AB/BC feeds; do not treat it as a LodgeX feed failure.
 
 ## Plan / gaps (current)
 
@@ -42,14 +46,17 @@
 3. **No user input sent anywhere** — camp lat/lon used only in-browser for haversine / Windy recenter.
 4. **No PII collection** — plan contacts are role titles/duties from the site document; blanks shown as gaps.
 5. **No production hosting / no push** until SOC 2 + Smart Lodge QA pass the same SHA.
-6. **XSS hygiene** — plan and feed strings rendered via `escapeHtml`.
-7. **Prototype authority boundary** — UI does not auto-evacuate.
+6. **XSS hygiene** — plan and feed strings rendered via `escapeHtml` (escapes `& < > " '`); route swatch colours go through a hex **allowlist** (`safeRouteColor`).
+7. **CSP** — meta CSP with `connect-src` limited to AB + BC FeatureServer hosts and `frame-src https://embed.windy.com`.
+8. **Prototype authority boundary** — UI does not auto-evacuate.
 
 ## QA notes (for Smart Lodge QA)
 
-- Live mode: both feeds respond; WHZ clear when no fire ≤150 km of pin.
-- `?test=1`: WHZ math (e.g. ~25.6 km → Level 2).
+- Live mode: both feeds respond; WHZ clear when no fire ≤150 km of pin (Hinton TEST pin).
+- `?test=1`: WHZ math (nearest sample → Level 2 near ~26 km).
+- Alert label: **100 to 150 km (monitor radius)** — aligned with 150 km app cap.
 - Contacts tab lists response-chart ICS roles without invented phones.
+- Unit check: `node test/whz-escape.test.js` (no deps) covers `computeWhzLevel` edges + `escapeHtml` / allowlist.
 - Screenshots under `screenshots/` for visual review.
 
 ## Request
