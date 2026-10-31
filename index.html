@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LodgeX Wildfire Radar (Prototype)</title>
+  <title>LodgeX Wildfire Preparedness · Radar</title>
   <style>
     :root {
       --bg: #070b10;
@@ -155,9 +155,7 @@
       width: min(100%, 640px);
       aspect-ratio: 1;
       border-radius: 50%;
-      background:
-        radial-gradient(circle at center, rgba(46,230,109,0.08) 0%, transparent 55%),
-        #050a0e;
+      background: #050a0e;
       border: 2px solid #1a3a28;
       box-shadow:
         0 0 0 1px #0d2018,
@@ -165,11 +163,36 @@
         0 0 40px rgba(0,0,0,0.5);
       overflow: hidden;
     }
+    /* Free Windy embed behind radar overlays (no API key). pointer-events none so canvas stays clickable. */
+    .windy-bg {
+      position: absolute;
+      inset: -8%;
+      width: 116%;
+      height: 116%;
+      border: 0;
+      z-index: 0;
+      pointer-events: none;
+      filter: saturate(0.85) brightness(0.72);
+      transform: scale(1.02);
+    }
+    .radar-scrim {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, rgba(5,10,14,0.22) 0%, rgba(5,10,14,0.40) 55%, rgba(5,10,14,0.58) 100%);
+    }
     canvas#radar {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       display: block;
       cursor: crosshair;
+      z-index: 2;
+      background: transparent;
     }
     .camp-label {
       position: absolute;
@@ -186,7 +209,15 @@
       max-width: 90%;
       overflow: hidden;
       text-overflow: ellipsis;
+      z-index: 3;
     }
+    .windy-credit {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-align: center;
+      margin: 0;
+    }
+    .windy-credit a { color: #8ab4ff; }
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -254,20 +285,163 @@
       padding: 12px 16px 24px;
     }
     footer a { color: #7a9aba; }
+
+    .whz-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: #0c141c;
+      font-size: 0.9rem;
+    }
+    .whz-banner .level {
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+    .whz-banner .level.none { background:#152030; color: var(--muted); }
+    .whz-banner .level.alert { background:#1a2a18; color: var(--green); border-color:#2a6a42; }
+    .whz-banner .level.level1 { background:#3a2a08; color: var(--amber); border-color:#6a4e10; }
+    .whz-banner .level.level2 { background:#3a2010; color:#ff9a4d; border-color:#6a3a18; }
+    .whz-banner .level.level3 { background:#3a1010; color: var(--red); border-color:#6a2020; }
+    .whz-banner .reason { color: var(--muted); flex: 1; min-width: 200px; }
+    .whz-banner .reason strong { color: var(--text); }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .tabs button {
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      background: #0a121a;
+    }
+    .tabs button.active {
+      background: #1d4a2e;
+      border-color: #2a6a42;
+      color: #b8ffd0;
+    }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .action-list, .route-steps, .contact-list, .gap-list {
+      margin: 0; padding: 0; list-style: none;
+    }
+    .action-list li, .route-steps li, .contact-list li, .gap-list li, .muster-steps li {
+      font-size: 0.82rem;
+      color: var(--text);
+      border-left: 3px solid #2a6a42;
+      padding: 6px 10px;
+      margin-bottom: 6px;
+      background: #0a121a;
+      border-radius: 0 8px 8px 0;
+      line-height: 1.4;
+    }
+    .action-list li.active-whz { border-left-color: var(--amber); background: #1a1408; }
+    .gap-list li { border-left-color: #6a4e10; color: var(--muted); }
+    .route-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: #0a121a;
+    }
+    .route-card h3 {
+      margin: 0 0 6px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .route-card .swatch {
+      width: 10px; height: 10px; border-radius: 50%;
+      display: inline-block;
+    }
+    .route-card .meta-line { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
+    .contact-role { font-weight: 650; color: var(--green); margin-bottom: 4px; }
+    .contact-duty { font-size: 0.78rem; color: var(--muted); margin-left: 8px; }
+    .plan-meta {
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.45;
+      margin-bottom: 10px;
+    }
+    .whz-all details {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      background: #0a121a;
+    }
+    .whz-all summary {
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 650;
+      color: var(--text);
+    }
+    .aq-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+      margin-top: 8px;
+    }
+    .aq-table th, .aq-table td {
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .aq-table th { background: #152030; color: var(--muted); font-weight: 650; }
+    main.with-prep {
+      grid-template-columns: minmax(260px, 340px) 1fr minmax(280px, 400px);
+    }
+    @media (max-width: 1100px) {
+      main.with-prep { grid-template-columns: 1fr; }
+    }
+    .prep-scroll { max-height: min(78vh, 900px); overflow: auto; }
+
+
+    .src-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-right: 6px;
+      vertical-align: middle;
+      letter-spacing: 0.04em;
+    }
+    .src-badge.ab { background: #1a3a28; color: #8dffb0; border: 1px solid #2a6a42; }
+    .src-badge.bc { background: #102038; color: #8ab4ff; border: 1px solid #2a4a7a; }
   </style>
 </head>
 <body>
-  <div id="testBanner" class="test-banner">TEST DATA MODE — sample fires only (not live Alberta Wildfire feed)</div>
+  <div id="testBanner" class="test-banner">TEST DATA MODE — sample fires only (not live AB/BC wildfire feeds)</div>
+  
+  <div id="whzBanner" class="whz-banner" role="status" aria-live="polite">
+    <span class="level none" id="whzLevelBadge">WHZ —</span>
+    <span class="reason" id="whzReason">Loading plan…</span>
+    <span class="meta" style="font-size:0.75rem">Plan: <strong id="planSiteLabel">—</strong></span>
+  </div>
+
   <header>
-    <h1>LodgeX <span>Wildfire Radar</span> <span class="badge" id="modeBadge">PROTOTYPE</span></h1>
+    <h1>LodgeX <span>Wildfire Preparedness</span> <span class="badge" id="modeBadge">PROTOTYPE</span></h1>
     <div class="meta">
-      <div>Source: Alberta Wildfire FeatureServer (active locations)</div>
+      <div>Sources: AB Wildfire + BCWS ActiveFires (public)</div>
       <div>Last updated: <strong id="lastUpdated">—</strong></div>
-      <div>Active in AB: <strong id="abCount">—</strong> · Within 150 km: <strong id="nearCount">—</strong></div>
+      <div>Active AB: <strong id="abCount">—</strong> · BC: <strong id="bcCount">—</strong> · Within 150 km: <strong id="nearCount">—</strong></div>
     </div>
   </header>
 
-  <main>
+  <main class="with-prep">
     <aside>
       <div class="panel">
         <h2>Camp location</h2>
@@ -305,32 +479,114 @@
     <section class="radar-wrap panel">
       <h2 style="align-self:flex-start">Radar · 150 km sweep</h2>
       <div class="radar-frame">
+        <iframe
+          id="windyBg"
+          class="windy-bg"
+          title="Windy wind overlay (background)"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          allowfullscreen
+          src="https://embed.windy.com/embed2.html?lat=54.464&lon=-110.182&detailLat=54.464&detailLon=-110.182&zoom=7&level=surface&overlay=wind&product=ecmwf&menu=&message=false&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1"
+        ></iframe>
+        <div class="radar-scrim" aria-hidden="true"></div>
         <canvas id="radar" width="720" height="720" aria-label="Wildfire radar"></canvas>
         <div class="camp-label" id="campLabel">Test Camp (placeholder)</div>
       </div>
+      <p class="windy-credit">Wind background: free <a href="https://www.windy.com/" target="_blank" rel="noopener">Windy</a> embed (no API key). Interactive Map Forecast API not used.</p>
       <div class="legend">
         <span><i style="background:#2ee66d"></i>Camp (placeholder)</span>
         <span><i style="background:#ff4d4d"></i>Out of Control</span>
         <span><i style="background:#f5a524"></i>Being Held</span>
         <span><i style="background:#4da3ff"></i>Under Control / other</span>
-        <span>Rings: 50 · 100 · 150 km</span>
+        <span><span class="src-badge ab">AB</span> Alberta · <span class="src-badge bc">BC</span> British Columbia</span>
+        <span>Rings: 25 · 50 · 100 · 150 km (WHZ)</span>
       </div>
     </section>
+
+    <aside class="panel prep-scroll" id="prepPanel">
+      <h2>Site wildfire plan</h2>
+      <div class="plan-meta" id="planMeta"></div>
+      <div class="tabs" id="prepTabs" role="tablist">
+        <button type="button" class="active" data-tab="trigger" role="tab">Trigger &amp; actions</button>
+        <button type="button" data-tab="routes" role="tab">Routes &amp; muster</button>
+        <button type="button" data-tab="contacts" role="tab">Contacts</button>
+        <button type="button" data-tab="air" role="tab">Air quality</button>
+        <button type="button" data-tab="gaps" role="tab">Plan gaps</button>
+      </div>
+
+      <div class="tab-pane active" id="tab-trigger" role="tabpanel">
+        <h2 style="margin-top:4px">Active trigger (from nearest fire)</h2>
+        <p class="hint" id="activeTriggerSummary" style="margin-top:0"></p>
+        <ul class="action-list" id="activeActions"></ul>
+        <h2>All WHZ levels (from plan chart)</h2>
+        <div class="whz-all" id="allWhz"></div>
+        <h2>Recommended site resources</h2>
+        <ul class="action-list" id="resourceList"></ul>
+      </div>
+
+      <div class="tab-pane" id="tab-routes" role="tabpanel">
+        <h2>Muster / assembly</h2>
+        <div id="musterBlock"></div>
+        <h2>Evacuation routes</h2>
+        <div id="routesBlock"></div>
+        <h2>Off-site centres</h2>
+        <ul class="action-list" id="centresList"></ul>
+      </div>
+
+      <div class="tab-pane" id="tab-contacts" role="tabpanel">
+        <h2>Emergency</h2>
+        <ul class="contact-list" id="emergencyContacts"></ul>
+        <h2>Roles &amp; responsibilities</h2>
+        <ul class="contact-list" id="roleContacts"></ul>
+        <h2>Wildfire response chart (ICS roles)</h2>
+        <p class="hint" style="margin-top:0">Verbatim duties from the site plan response chart. Named people / phone numbers are blank in the source — not invented.</p>
+        <ul class="contact-list" id="responseChartRoles"></ul>
+        <h2>Radio channels</h2>
+        <ul class="action-list" id="radioList"></ul>
+        <h2>Named teams (as in plan)</h2>
+        <ul class="gap-list" id="namedTeams"></ul>
+        <h2>Forestry form fields</h2>
+        <ul class="gap-list" id="forestryFields"></ul>
+      </div>
+
+      <div class="tab-pane" id="tab-air" role="tabpanel">
+        <p class="hint" id="aqNote"></p>
+        <table class="aq-table" id="aqVisibility"><thead></thead><tbody></tbody></table>
+        <h2 style="margin-top:14px">Recommended wildfire air quality response</h2>
+        <div id="aqActions"></div>
+        <h2>Carbon monoxide</h2>
+        <p class="hint" id="coNote"></p>
+      </div>
+
+      <div class="tab-pane" id="tab-gaps" role="tabpanel">
+        <p class="hint">Only content present in the site plan is shown elsewhere. Items below are missing or non-extractable — not invented.</p>
+        <ul class="gap-list" id="gapsList"></ul>
+      </div>
+    </aside>
+
   </main>
 
   <footer>
     Data © Government of Alberta ·
-    <a href="https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0" target="_blank" rel="noopener">Active Alberta Wildfire Locations</a>
-    · Prototype only · Auto-refresh every 5 minutes
+    <a href="https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0" target="_blank" rel="noopener">AB Active Wildfire Locations</a>
+    · Data © Province of British Columbia / BC Wildfire Service ·
+    <a href="https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0" target="_blank" rel="noopener">BCWS ActiveFires PublicView</a>
+    · Prototype / local only · Plan embedded from site-specific doc · Auto-refresh every 5 minutes
   </footer>
 
+  <script src="plan-data.js"></script>
   <script>
 (function () {
-  const API =
+  const API_AB =
     "https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0/query" +
     "?where=1%3D1&outFields=*&returnGeometry=true&f=geojson";
+  const API_BC =
+    "https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0/query" +
+    "?where=" + encodeURIComponent("FIRE_STATUS <> 'Out'") +
+    "&outFields=FIRE_NUMBER,FIRE_STATUS,CURRENT_SIZE,LATITUDE,LONGITUDE,INCIDENT_NAME,GEOGRAPHIC_DESCRIPTION" +
+    "&returnGeometry=true&outSR=4326&f=geojson&resultRecordCount=2000";
   const RADIUS_KM = 150;
-  const RINGS = [50, 100, 150];
+  const RINGS = [25, 50, 100, 150];
   const REFRESH_MS = 5 * 60 * 1000;
   const DEFAULT = { name: "Test Camp (placeholder)", lat: 54.464, lon: -110.182 };
 
@@ -348,10 +604,33 @@
     emptyMsg: document.getElementById("emptyMsg"),
     lastUpdated: document.getElementById("lastUpdated"),
     abCount: document.getElementById("abCount"),
+    bcCount: document.getElementById("bcCount"),
     nearCount: document.getElementById("nearCount"),
     fetchStatus: document.getElementById("fetchStatus"),
     testBanner: document.getElementById("testBanner"),
     modeBadge: document.getElementById("modeBadge"),
+    whzLevelBadge: document.getElementById("whzLevelBadge"),
+    whzReason: document.getElementById("whzReason"),
+    planSiteLabel: document.getElementById("planSiteLabel"),
+    planMeta: document.getElementById("planMeta"),
+    activeTriggerSummary: document.getElementById("activeTriggerSummary"),
+    activeActions: document.getElementById("activeActions"),
+    allWhz: document.getElementById("allWhz"),
+    resourceList: document.getElementById("resourceList"),
+    musterBlock: document.getElementById("musterBlock"),
+    routesBlock: document.getElementById("routesBlock"),
+    centresList: document.getElementById("centresList"),
+    emergencyContacts: document.getElementById("emergencyContacts"),
+    roleContacts: document.getElementById("roleContacts"),
+    responseChartRoles: document.getElementById("responseChartRoles"),
+    radioList: document.getElementById("radioList"),
+    namedTeams: document.getElementById("namedTeams"),
+    forestryFields: document.getElementById("forestryFields"),
+    aqNote: document.getElementById("aqNote"),
+    aqVisibility: document.getElementById("aqVisibility"),
+    aqActions: document.getElementById("aqActions"),
+    coNote: document.getElementById("coNote"),
+    gapsList: document.getElementById("gapsList"),
   };
 
   let camp = { ...DEFAULT };
@@ -360,36 +639,54 @@
   let sweep = 0;        // radians
   let hoverIdx = -1;
   let lastFetchOk = false;
+  let feedStatus = { ab: null, bc: null }; // "ok" | "error" | null
 
   // --- Test sample fires (relative to default Cold Lake placeholder) ---
   const TEST_FIRES = [
     {
       LABEL: "TEST-OC-01",
+      FIRE_NUMBER: "TEST-OC-01",
       FIRE_STATUS: "Out of Control",
       AREA_ESTIMATE: 420.5,
       LATITUDE: 54.70,
       LONGITUDE: -110.05,
+      SOURCE: "AB",
     },
     {
       LABEL: "TEST-BH-02",
+      FIRE_NUMBER: "TEST-BH-02",
       FIRE_STATUS: "Being Held",
       AREA_ESTIMATE: 85,
       LATITUDE: 54.30,
       LONGITUDE: -109.75,
+      SOURCE: "AB",
     },
     {
       LABEL: "TEST-UC-03",
+      FIRE_NUMBER: "TEST-UC-03",
       FIRE_STATUS: "Under Control",
       AREA_ESTIMATE: 12.3,
       LATITUDE: 54.55,
       LONGITUDE: -110.55,
+      SOURCE: "AB",
+    },
+    {
+      LABEL: "TEST-BC-05",
+      FIRE_NUMBER: "TEST-BC-05",
+      FIRE_STATUS: "Being Held",
+      AREA_ESTIMATE: 210,
+      LATITUDE: 54.20,
+      LONGITUDE: -111.40,
+      SOURCE: "BC",
     },
     {
       LABEL: "TEST-FAR-04",
+      FIRE_NUMBER: "TEST-FAR-04",
       FIRE_STATUS: "Out of Control",
       AREA_ESTIMATE: 900,
       LATITUDE: 56.0,
       LONGITUDE: -112.0,
+      SOURCE: "AB",
     },
   ];
 
@@ -450,6 +747,134 @@
     return "#c0c8d0";
   }
 
+
+  const PLAN = window.WILDFIRE_PLAN;
+  if (!PLAN) {
+    console.error("plan-data.js missing");
+  }
+
+  function renderPlanStatic() {
+    if (!PLAN) return;
+    el.planSiteLabel.textContent = PLAN.meta.site;
+    el.planMeta.innerHTML =
+      "<strong>" + escapeHtml(PLAN.meta.title) + "</strong><br/>" +
+      "Site: " + escapeHtml(PLAN.meta.site) + "<br/>" +
+      "Document: " + escapeHtml(PLAN.meta.documentDateLabel) + "<br/>" +
+      "Report wildfire: <strong>" + escapeHtml(PLAN.meta.reportWildfire) + "</strong>";
+
+    el.allWhz.innerHTML = "";
+    PLAN.whzLevels.slice().sort((a,b) => b.severity - a.severity).forEach((lvl) => {
+      const d = document.createElement("details");
+      d.innerHTML =
+        "<summary>" + escapeHtml(lvl.name) + " — " + escapeHtml(lvl.rangeLabel) + "</summary>" +
+        "<ul class='action-list'>" +
+        lvl.actions.map((a) => "<li>" + escapeHtml(a) + "</li>").join("") +
+        "</ul>";
+      el.allWhz.appendChild(d);
+    });
+
+    el.resourceList.innerHTML = PLAN.resourceList.map((r) => "<li>" + escapeHtml(r) + "</li>").join("");
+
+    el.musterBlock.innerHTML = PLAN.musterPoints.map((m) =>
+      "<div class='route-card'><h3>" + escapeHtml(m.name) + "</h3>" +
+      "<p class='meta-line'>" + escapeHtml(m.detail) + "</p>" +
+      "<ul class='action-list'>" + m.steps.map((s) => "<li>" + escapeHtml(s) + "</li>").join("") + "</ul></div>"
+    ).join("");
+
+    el.routesBlock.innerHTML = PLAN.evacuationRoutes.map((r) =>
+      "<div class='route-card'><h3><span class='swatch' style='background:" + r.color + "'></span>" +
+      escapeHtml(r.name) + "</h3>" +
+      "<div class='meta-line'>Destination: " + escapeHtml(r.destination) +
+      " · Radio: " + escapeHtml(r.radio) + "</div>" +
+      "<ul class='action-list'>" + r.steps.map((s) => "<li>" + escapeHtml(s) + "</li>").join("") + "</ul></div>"
+    ).join("");
+
+    el.centresList.innerHTML = PLAN.offSiteCentres.map((c) => "<li>" + escapeHtml(c) + "</li>").join("");
+
+    el.emergencyContacts.innerHTML = PLAN.contacts.emergencyReport.map((c) =>
+      "<li><div class='contact-role'>" + escapeHtml(c.role) + "</div><div class='contact-duty'>" + escapeHtml(c.detail) + "</div></li>"
+    ).join("");
+
+    el.roleContacts.innerHTML = PLAN.contacts.roles.map((c) =>
+      "<li><div class='contact-role'>" + escapeHtml(c.role) + "</div>" +
+      c.duties.map((d) => "<div class='contact-duty'>• " + escapeHtml(d) + "</div>").join("") +
+      "</li>"
+    ).join("");
+
+    const chartRoles = (PLAN.contacts.responseChartRoles || []);
+    el.responseChartRoles.innerHTML = chartRoles.map((c) =>
+      "<li><div class='contact-role'>" + escapeHtml(c.role) + "</div>" +
+      c.duties.map((d) => "<div class='contact-duty'>• " + escapeHtml(d) + "</div>").join("") +
+      "</li>"
+    ).join("");
+
+    el.radioList.innerHTML = PLAN.contacts.radioChannels.map((r) =>
+      "<li><strong>" + escapeHtml(r.channel) + "</strong> — " + escapeHtml(r.use) + "</li>"
+    ).join("");
+
+    el.namedTeams.innerHTML = PLAN.contacts.namedTeams.map((t) => "<li>" + escapeHtml(t) + "</li>").join("");
+    el.forestryFields.innerHTML = PLAN.contacts.forestryFormFields.map((t) => "<li>" + escapeHtml(t) + "</li>").join("");
+
+    el.aqNote.textContent = PLAN.airQuality.note;
+    const thead = el.aqVisibility.querySelector("thead");
+    const tbody = el.aqVisibility.querySelector("tbody");
+    thead.innerHTML = "<tr><th>Visibility</th><th>Category</th><th>Approx. PM2.5 (µg/m³)</th></tr>";
+    tbody.innerHTML = PLAN.airQuality.visibilityTable.map((r) =>
+      "<tr><td>" + escapeHtml(r.visibilityKm) + "</td><td>" + escapeHtml(r.category) +
+      "</td><td>" + escapeHtml(r.pm25) + "</td></tr>"
+    ).join("");
+
+    el.aqActions.innerHTML = PLAN.airQuality.responseActions.map((r) =>
+      "<details class='whz-all'><summary>" + escapeHtml(r.category) + "</summary>" +
+      "<p class='hint'><strong>At risk:</strong> " + escapeHtml(r.atRisk) + "<br/>" +
+      "<strong>Others:</strong> " + escapeHtml(r.others) + "</p>" +
+      "<ul class='action-list'>" + r.actions.map((a) => "<li>" + escapeHtml(a) + "</li>").join("") +
+      "</ul></details>"
+    ).join("");
+
+    el.coNote.textContent = PLAN.airQuality.carbonMonoxide.note;
+    el.gapsList.innerHTML = PLAN.gaps.map((g) => "<li>" + escapeHtml(g) + "</li>").join("");
+  }
+
+  function updateWhzUi() {
+    if (!PLAN || !window.computeWhzLevel) return;
+    const nearest = near.length ? near[0].dist : null;
+    const result = window.computeWhzLevel(nearest, RADIUS_KM);
+    const badge = el.whzLevelBadge;
+    badge.className = "level none";
+    if (!result.level) {
+      badge.textContent = "WHZ — CLEAR / OUTSIDE TRIGGERS";
+      el.whzReason.innerHTML = escapeHtml(result.reason);
+      el.activeTriggerSummary.textContent = result.reason;
+      el.activeActions.innerHTML = "<li>No distance-triggered WHZ actions active. Continue Fire Watch per site practice.</li>";
+    } else {
+      const id = result.level.id;
+      badge.className = "level " + (id === "alert" ? "alert" : id);
+      badge.textContent = result.level.name + " · " + result.level.rangeLabel;
+      const fireLabel = near[0] ? (near[0].LABEL || near[0].FIRE_NUMBER || "Unknown") : "—";
+      el.whzReason.innerHTML =
+        escapeHtml(result.reason) +
+        " · Driving fire: <strong>" + escapeHtml(fireLabel) + "</strong>";
+      el.activeTriggerSummary.textContent =
+        result.reason + " · Driving fire: " + fireLabel +
+        " · Route decision remains with Incident Commander (TCE Site Construction Manager).";
+      el.activeActions.innerHTML = result.level.actions
+        .map((a) => "<li class='active-whz'>" + escapeHtml(a) + "</li>")
+        .join("");
+    }
+  }
+
+  // Tabs
+  document.querySelectorAll("#prepTabs button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#prepTabs button").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab-pane").forEach((p) => p.classList.remove("active"));
+      btn.classList.add("active");
+      const pane = document.getElementById("tab-" + btn.dataset.tab);
+      if (pane) pane.classList.add("active");
+    });
+  });
+
   function applyCampFromInputs() {
     const lat = parseFloat(el.lat.value);
     const lon = parseFloat(el.lon.value);
@@ -466,9 +891,42 @@
     }
     camp = { name, lat, lon };
     el.campLabel.textContent = name;
+    updateWindyEmbed(lat, lon);
     recomputeNear();
     renderList();
     return true;
+  }
+
+  /** Free Windy embed2 iframe — no API key. Recenters wind map on camp pin. */
+  function updateWindyEmbed(lat, lon) {
+    const iframe = document.getElementById("windyBg");
+    if (!iframe || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const q = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      detailLat: String(lat),
+      detailLon: String(lon),
+      zoom: "7",
+      level: "surface",
+      overlay: "wind",
+      product: "ecmwf",
+      menu: "",
+      message: "false",
+      marker: "true",
+      calendar: "now",
+      pressure: "",
+      type: "map",
+      location: "coordinates",
+      detail: "",
+      metricWind: "default",
+      metricTemp: "default",
+      radarRange: "-1",
+    });
+    const next = "https://embed.windy.com/embed2.html?" + q.toString();
+    if (iframe.dataset.lastSrc !== next) {
+      iframe.dataset.lastSrc = next;
+      iframe.src = next;
+    }
   }
 
   function recomputeNear() {
@@ -483,6 +941,7 @@
       .filter((f) => f.dist <= RADIUS_KM)
       .sort((a, b) => a.dist - b.dist);
     el.nearCount.textContent = String(near.length);
+    updateWhzUi();
   }
 
   function renderList() {
@@ -497,8 +956,11 @@
       const li = document.createElement("li");
       li.dataset.idx = String(i);
       const ha = f.AREA_ESTIMATE != null ? Number(f.AREA_ESTIMATE).toLocaleString() : "—";
+      const src = (f.SOURCE || "?").toUpperCase();
+      const srcClass = src === "BC" ? "bc" : "ab";
+      const num = f.FIRE_NUMBER || f.LABEL || "Unknown";
       li.innerHTML =
-        `<div class="name">${escapeHtml(f.LABEL || f.FIRE_NUMBER || "Unknown")}</div>` +
+        `<div class="name"><span class="src-badge ${srcClass}">${escapeHtml(src)}</span>${escapeHtml(num)}</div>` +
         `<div class="detail">` +
         `Status: <strong style="color:${statusColor(f.FIRE_STATUS)}">${escapeHtml(f.FIRE_STATUS || "—")}</strong><br/>` +
         `Size: ${ha} ha · Distance: ${f.dist.toFixed(1)} km · Bearing: ${f.brg.toFixed(0)}°<br/>` +
@@ -518,66 +980,131 @@
       .replace(/"/g, "&quot;");
   }
 
-  function parseFeatures(geojson) {
+  function coordsFromFeature(ft, p) {
+    let lat = p.LATITUDE;
+    let lon = p.LONGITUDE;
+    if ((lat == null || lon == null) && ft.geometry && ft.geometry.coordinates) {
+      lon = ft.geometry.coordinates[0];
+      lat = ft.geometry.coordinates[1];
+    }
+    return { lat: Number(lat), lon: Number(lon) };
+  }
+
+  function parseAbFeatures(geojson) {
     const features = (geojson && geojson.features) || [];
     return features.map((ft) => {
       const p = ft.properties || {};
-      let lat = p.LATITUDE;
-      let lon = p.LONGITUDE;
-      if ((lat == null || lon == null) && ft.geometry && ft.geometry.coordinates) {
-        lon = ft.geometry.coordinates[0];
-        lat = ft.geometry.coordinates[1];
-      }
+      const { lat, lon } = coordsFromFeature(ft, p);
+      const num = p.FIRE_NUMBER || p.LABEL || null;
       return {
-        LABEL: p.LABEL,
-        FIRE_NUMBER: p.FIRE_NUMBER,
+        LABEL: p.LABEL || num,
+        FIRE_NUMBER: num,
         FIRE_STATUS: p.FIRE_STATUS,
         AREA_ESTIMATE: p.AREA_ESTIMATE,
-        LATITUDE: Number(lat),
-        LONGITUDE: Number(lon),
+        LATITUDE: lat,
+        LONGITUDE: lon,
+        SOURCE: "AB",
       };
     }).filter((f) => Number.isFinite(f.LATITUDE) && Number.isFinite(f.LONGITUDE));
+  }
+
+  function parseBcFeatures(geojson) {
+    const features = (geojson && geojson.features) || [];
+    return features.map((ft) => {
+      const p = ft.properties || {};
+      const { lat, lon } = coordsFromFeature(ft, p);
+      const num = p.FIRE_NUMBER || p.INCIDENT_NAME || null;
+      return {
+        LABEL: num,
+        FIRE_NUMBER: num,
+        FIRE_STATUS: p.FIRE_STATUS,
+        AREA_ESTIMATE: p.CURRENT_SIZE != null ? p.CURRENT_SIZE : null,
+        LATITUDE: lat,
+        LONGITUDE: lon,
+        SOURCE: "BC",
+      };
+    }).filter((f) => Number.isFinite(f.LATITUDE) && Number.isFinite(f.LONGITUDE));
+  }
+
+  async function fetchOneFeed(url, label) {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(label + " HTTP " + res.status);
+    return res.json();
   }
 
   async function fetchFires() {
     if (TEST_MODE) {
       fires = TEST_FIRES.map((f) => ({ ...f }));
       lastFetchOk = true;
-      el.abCount.textContent = String(fires.length) + " (test)";
+      feedStatus = { ab: "ok", bc: "ok" };
+      const abN = fires.filter((f) => f.SOURCE === "AB").length;
+      const bcN = fires.filter((f) => f.SOURCE === "BC").length;
+      el.abCount.textContent = String(abN) + " (test)";
+      el.bcCount.textContent = String(bcN) + " (test)";
       el.lastUpdated.textContent = new Date().toLocaleString("en-CA", {
         timeZone: "America/Edmonton",
         hour12: false,
       }) + " MT (TEST)";
-      el.fetchStatus.textContent = "Using TEST DATA — not the live Alberta feed";
+      el.fetchStatus.textContent = "Using TEST DATA — not live AB/BC feeds";
       el.fetchStatus.className = "status-line err";
       recomputeNear();
       renderList();
       return;
     }
 
-    el.fetchStatus.textContent = "Fetching Alberta Wildfire feed…";
+    el.fetchStatus.textContent = "Fetching AB + BC wildfire feeds…";
     el.fetchStatus.className = "status-line";
-    try {
-      const res = await fetch(API, { cache: "no-store" });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      fires = parseFeatures(data);
-      lastFetchOk = true;
-      el.abCount.textContent = String(fires.length);
-      el.lastUpdated.textContent = new Date().toLocaleString("en-CA", {
-        timeZone: "America/Edmonton",
-        hour12: false,
-      }) + " MT";
-      el.fetchStatus.textContent = "Live feed OK · " + fires.length + " active fire(s) in Alberta";
-      el.fetchStatus.className = "status-line ok";
-      recomputeNear();
-      renderList();
-    } catch (err) {
-      lastFetchOk = false;
-      el.fetchStatus.textContent = "Fetch failed: " + (err && err.message ? err.message : err);
-      el.fetchStatus.className = "status-line err";
+
+    const [abResult, bcResult] = await Promise.allSettled([
+      fetchOneFeed(API_AB, "AB"),
+      fetchOneFeed(API_BC, "BC"),
+    ]);
+
+    const next = [];
+    const parts = [];
+
+    if (abResult.status === "fulfilled") {
+      const abFires = parseAbFeatures(abResult.value);
+      next.push(...abFires);
+      feedStatus.ab = "ok";
+      el.abCount.textContent = String(abFires.length);
+      parts.push("AB OK (" + abFires.length + ")");
+    } else {
+      feedStatus.ab = "error";
       el.abCount.textContent = "error";
+      const msg = abResult.reason && abResult.reason.message ? abResult.reason.message : String(abResult.reason);
+      parts.push("AB failed: " + msg);
+      // Keep previously loaded AB fires if any
+      next.push(...fires.filter((f) => f.SOURCE === "AB"));
     }
+
+    if (bcResult.status === "fulfilled") {
+      const bcFires = parseBcFeatures(bcResult.value);
+      next.push(...bcFires);
+      feedStatus.bc = "ok";
+      el.bcCount.textContent = String(bcFires.length);
+      parts.push("BC OK (" + bcFires.length + ")");
+    } else {
+      feedStatus.bc = "error";
+      el.bcCount.textContent = "error";
+      const msg = bcResult.reason && bcResult.reason.message ? bcResult.reason.message : String(bcResult.reason);
+      parts.push("BC failed: " + msg);
+      next.push(...fires.filter((f) => f.SOURCE === "BC"));
+    }
+
+    fires = next;
+    lastFetchOk = feedStatus.ab === "ok" || feedStatus.bc === "ok";
+    el.lastUpdated.textContent = new Date().toLocaleString("en-CA", {
+      timeZone: "America/Edmonton",
+      hour12: false,
+    }) + " MT";
+
+    const bothOk = feedStatus.ab === "ok" && feedStatus.bc === "ok";
+    el.fetchStatus.textContent = parts.join(" · ");
+    el.fetchStatus.className = "status-line " + (bothOk ? "ok" : lastFetchOk ? "" : "err");
+
+    recomputeNear();
+    renderList();
   }
 
   // --- Radar drawing ---
@@ -590,8 +1117,8 @@
 
     ctx.clearRect(0, 0, w, h);
 
-    // background grid glow
-    ctx.fillStyle = "#050a0e";
+    // Light tint only — Windy iframe shows through (keep rings/fires readable)
+    ctx.fillStyle = "rgba(5, 10, 14, 0.18)";
     ctx.beginPath();
     ctx.arc(cx, cy, maxR + 8, 0, Math.PI * 2);
     ctx.fill();
@@ -690,7 +1217,8 @@
       // label
       ctx.font = (highlight ? "bold " : "") + "11px Segoe UI, sans-serif";
       ctx.fillStyle = "#e8eef5";
-      ctx.fillText(f.LABEL || f.FIRE_NUMBER || "?", x + 9, y - 6);
+      const tag = (f.SOURCE ? f.SOURCE + " " : "") + (f.FIRE_NUMBER || f.LABEL || "?");
+      ctx.fillText(tag, x + 9, y - 6);
     });
 
     // camp center
@@ -751,6 +1279,7 @@
   document.getElementById("btnRefresh").addEventListener("click", () => fetchFires());
 
   // init
+  renderPlanStatic();
   applyCampFromInputs();
   fetchFires();
   setInterval(fetchFires, REFRESH_MS);
@@ -758,7 +1287,7 @@
 
   // Expose for headless tests
   window.__radar = {
-    getState: () => ({ camp, fires: fires.length, near: near.map((f) => ({ label: f.LABEL, dist: f.dist, brg: f.brg })), test: TEST_MODE, lastFetchOk }),
+    getState: () => ({ camp, fires: fires.length, ab: fires.filter((f) => f.SOURCE === "AB").length, bc: fires.filter((f) => f.SOURCE === "BC").length, near: near.map((f) => ({ label: f.FIRE_NUMBER || f.LABEL, dist: f.dist, brg: f.brg, status: f.FIRE_STATUS, source: f.SOURCE })), test: TEST_MODE, lastFetchOk, feedStatus, whz: window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM) }),
     fetchFires,
   };
 })();
