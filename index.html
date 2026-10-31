@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LodgeX Wildfire Radar (Prototype)</title>
+  <style>
+    :root {
+      --bg: #070b10;
+      --panel: #0f1620;
+      --border: #1e2a3a;
+      --green: #2ee66d;
+      --green-dim: rgba(46, 230, 109, 0.25);
+      --amber: #f5a524;
+      --red: #ff4d4d;
+      --text: #e8eef5;
+      --muted: #8a9bb0;
+      --ring: rgba(46, 230, 109, 0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(ellipse at top, #101820 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 22, 32, 0.9);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+    }
+    header h1 span { color: var(--green); }
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #3a2a08;
+      color: var(--amber);
+      border: 1px solid #6a4e10;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    .badge.test {
+      background: #3a1010;
+      color: #ff8a8a;
+      border-color: #6a2020;
+    }
+    .meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: right;
+    }
+    .meta strong { color: var(--text); }
+    main {
+      display: grid;
+      grid-template-columns: minmax(280px, 380px) 1fr;
+      gap: 16px;
+      padding: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0a1018;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    input:focus {
+      outline: 2px solid var(--green-dim);
+      border-color: var(--green);
+    }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #152030;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+    }
+    button.primary {
+      background: linear-gradient(180deg, #1d4a2e, #143522);
+      border-color: #2a6a42;
+      color: #b8ffd0;
+    }
+    button:hover { filter: brightness(1.1); }
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin: 8px 0 0;
+      line-height: 1.4;
+    }
+    .status-line {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .status-line.err { color: var(--red); }
+    .status-line.ok { color: var(--green); }
+    .radar-wrap {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .radar-frame {
+      position: relative;
+      width: min(100%, 640px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, rgba(46,230,109,0.08) 0%, transparent 55%),
+        #050a0e;
+      border: 2px solid #1a3a28;
+      box-shadow:
+        0 0 0 1px #0d2018,
+        inset 0 0 60px rgba(46, 230, 109, 0.08),
+        0 0 40px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+    canvas#radar {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+    .camp-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, 14px);
+      font-size: 0.7rem;
+      color: #b8ffd0;
+      background: rgba(0,0,0,0.55);
+      padding: 2px 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      white-space: nowrap;
+      max-width: 90%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 18px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      justify-content: center;
+    }
+    .legend i {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .fire-list {
+      max-height: 420px;
+      overflow: auto;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .fire-list li {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      background: #0a121a;
+    }
+    .fire-list li:hover { border-color: #2a4a38; }
+    .fire-list .name {
+      font-weight: 650;
+      color: var(--green);
+      margin-bottom: 4px;
+    }
+    .fire-list .detail {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .empty {
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 12px;
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+    }
+    .test-banner {
+      display: none;
+      background: #4a1515;
+      color: #ffc9c9;
+      text-align: center;
+      padding: 8px;
+      font-size: 0.85rem;
+      font-weight: 650;
+      border-bottom: 1px solid #7a3030;
+    }
+    .test-banner.show { display: block; }
+    footer {
+      text-align: center;
+      font-size: 0.7rem;
+      color: #5a6a7a;
+      padding: 12px 16px 24px;
+    }
+    footer a { color: #7a9aba; }
+  </style>
+</head>
+<body>
+  <div id="testBanner" class="test-banner">TEST DATA MODE — sample fires only (not live Alberta Wildfire feed)</div>
+  <header>
+    <h1>LodgeX <span>Wildfire Radar</span> <span class="badge" id="modeBadge">PROTOTYPE</span></h1>
+    <div class="meta">
+      <div>Source: Alberta Wildfire FeatureServer (active locations)</div>
+      <div>Last updated: <strong id="lastUpdated">—</strong></div>
+      <div>Active in AB: <strong id="abCount">—</strong> · Within 150 km: <strong id="nearCount">—</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <aside>
+      <div class="panel">
+        <h2>Camp location</h2>
+        <label for="campName">Name</label>
+        <input id="campName" type="text" value="Test Camp (placeholder)" />
+        <div class="row" style="margin-top:10px">
+          <div>
+            <label for="lat">Latitude</label>
+            <input id="lat" type="number" step="any" value="54.464" />
+          </div>
+          <div>
+            <label for="lon">Longitude</label>
+            <input id="lon" type="number" step="any" value="-110.182" />
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="primary" id="btnApply" type="button">Pin camp</button>
+          <button id="btnReset" type="button">Reset placeholder</button>
+          <button id="btnRefresh" type="button">Refresh now</button>
+        </div>
+        <p class="hint">
+          Default pin is a <strong>placeholder</strong> near Cold Lake, AB — not a real LodgeX camp.
+          Click the radar to move the pin (maps lat/lon from bearing/distance), or enter coordinates.
+        </p>
+        <div id="fetchStatus" class="status-line">Loading…</div>
+      </div>
+
+      <div class="panel" style="margin-top:16px">
+        <h2>Fires within 150 km</h2>
+        <ul class="fire-list" id="fireList"></ul>
+        <div class="empty" id="emptyMsg" style="display:none">No active wildfires within 150 km</div>
+      </div>
+    </aside>
+
+    <section class="radar-wrap panel">
+      <h2 style="align-self:flex-start">Radar · 150 km sweep</h2>
+      <div class="radar-frame">
+        <canvas id="radar" width="720" height="720" aria-label="Wildfire radar"></canvas>
+        <div class="camp-label" id="campLabel">Test Camp (placeholder)</div>
+      </div>
+      <div class="legend">
+        <span><i style="background:#2ee66d"></i>Camp (placeholder)</span>
+        <span><i style="background:#ff4d4d"></i>Out of Control</span>
+        <span><i style="background:#f5a524"></i>Being Held</span>
+        <span><i style="background:#4da3ff"></i>Under Control / other</span>
+        <span>Rings: 50 · 100 · 150 km</span>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Data © Government of Alberta ·
+    <a href="https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0" target="_blank" rel="noopener">Active Alberta Wildfire Locations</a>
+    · Prototype only · Auto-refresh every 5 minutes
+  </footer>
+
+  <script>
+(function () {
+  const API =
+    "https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0/query" +
+    "?where=1%3D1&outFields=*&returnGeometry=true&f=geojson";
+  const RADIUS_KM = 150;
+  const RINGS = [50, 100, 150];
+  const REFRESH_MS = 5 * 60 * 1000;
+  const DEFAULT = { name: "Test Camp (placeholder)", lat: 54.464, lon: -110.182 };
+
+  const params = new URLSearchParams(location.search);
+  const TEST_MODE = params.get("test") === "1";
+
+  const canvas = document.getElementById("radar");
+  const ctx = canvas.getContext("2d");
+  const el = {
+    campName: document.getElementById("campName"),
+    lat: document.getElementById("lat"),
+    lon: document.getElementById("lon"),
+    campLabel: document.getElementById("campLabel"),
+    fireList: document.getElementById("fireList"),
+    emptyMsg: document.getElementById("emptyMsg"),
+    lastUpdated: document.getElementById("lastUpdated"),
+    abCount: document.getElementById("abCount"),
+    nearCount: document.getElementById("nearCount"),
+    fetchStatus: document.getElementById("fetchStatus"),
+    testBanner: document.getElementById("testBanner"),
+    modeBadge: document.getElementById("modeBadge"),
+  };
+
+  let camp = { ...DEFAULT };
+  let fires = [];       // all active from feed
+  let near = [];        // within 150 km with distance/bearing
+  let sweep = 0;        // radians
+  let hoverIdx = -1;
+  let lastFetchOk = false;
+
+  // --- Test sample fires (relative to default Cold Lake placeholder) ---
+  const TEST_FIRES = [
+    {
+      LABEL: "TEST-OC-01",
+      FIRE_STATUS: "Out of Control",
+      AREA_ESTIMATE: 420.5,
+      LATITUDE: 54.70,
+      LONGITUDE: -110.05,
+    },
+    {
+      LABEL: "TEST-BH-02",
+      FIRE_STATUS: "Being Held",
+      AREA_ESTIMATE: 85,
+      LATITUDE: 54.30,
+      LONGITUDE: -109.75,
+    },
+    {
+      LABEL: "TEST-UC-03",
+      FIRE_STATUS: "Under Control",
+      AREA_ESTIMATE: 12.3,
+      LATITUDE: 54.55,
+      LONGITUDE: -110.55,
+    },
+    {
+      LABEL: "TEST-FAR-04",
+      FIRE_STATUS: "Out of Control",
+      AREA_ESTIMATE: 900,
+      LATITUDE: 56.0,
+      LONGITUDE: -112.0,
+    },
+  ];
+
+  if (TEST_MODE) {
+    el.testBanner.classList.add("show");
+    el.modeBadge.classList.add("test");
+    el.modeBadge.textContent = "TEST DATA";
+  }
+
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  /** Bearing degrees clockwise from north */
+  function bearingDeg(lat1, lon1, lat2, lon2) {
+    const toRad = (d) => (d * Math.PI) / 180;
+    const toDeg = (r) => (r * 180) / Math.PI;
+    const φ1 = toRad(lat1), φ2 = toRad(lat2);
+    const Δλ = toRad(lon2 - lon1);
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  /** Destination lat/lon given distance km and bearing deg from north */
+  function destination(lat, lon, distKm, bearing) {
+    const R = 6371;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const toDeg = (r) => (r * 180) / Math.PI;
+    const δ = distKm / R;
+    const θ = toRad(bearing);
+    const φ1 = toRad(lat);
+    const λ1 = toRad(lon);
+    const φ2 = Math.asin(
+      Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(θ)
+    );
+    const λ2 =
+      λ1 +
+      Math.atan2(
+        Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
+        Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2)
+      );
+    return { lat: toDeg(φ2), lon: ((toDeg(λ2) + 540) % 360) - 180 };
+  }
+
+  function statusColor(status) {
+    const s = (status || "").toLowerCase();
+    if (s.includes("out of control")) return "#ff4d4d";
+    if (s.includes("being held")) return "#f5a524";
+    if (s.includes("under control")) return "#4da3ff";
+    return "#c0c8d0";
+  }
+
+  function applyCampFromInputs() {
+    const lat = parseFloat(el.lat.value);
+    const lon = parseFloat(el.lon.value);
+    const name = (el.campName.value || "").trim() || DEFAULT.name;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      el.fetchStatus.textContent = "Invalid lat/lon";
+      el.fetchStatus.className = "status-line err";
+      return false;
+    }
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      el.fetchStatus.textContent = "Lat must be −90…90, lon −180…180";
+      el.fetchStatus.className = "status-line err";
+      return false;
+    }
+    camp = { name, lat, lon };
+    el.campLabel.textContent = name;
+    recomputeNear();
+    renderList();
+    return true;
+  }
+
+  function recomputeNear() {
+    near = fires
+      .map((f) => {
+        const lat = f.LATITUDE;
+        const lon = f.LONGITUDE;
+        const dist = haversineKm(camp.lat, camp.lon, lat, lon);
+        const brg = bearingDeg(camp.lat, camp.lon, lat, lon);
+        return { ...f, dist, brg, lat, lon };
+      })
+      .filter((f) => f.dist <= RADIUS_KM)
+      .sort((a, b) => a.dist - b.dist);
+    el.nearCount.textContent = String(near.length);
+  }
+
+  function renderList() {
+    el.fireList.innerHTML = "";
+    if (near.length === 0) {
+      el.emptyMsg.style.display = "block";
+      el.emptyMsg.textContent = "No active wildfires within 150 km";
+      return;
+    }
+    el.emptyMsg.style.display = "none";
+    near.forEach((f, i) => {
+      const li = document.createElement("li");
+      li.dataset.idx = String(i);
+      const ha = f.AREA_ESTIMATE != null ? Number(f.AREA_ESTIMATE).toLocaleString() : "—";
+      li.innerHTML =
+        `<div class="name">${escapeHtml(f.LABEL || f.FIRE_NUMBER || "Unknown")}</div>` +
+        `<div class="detail">` +
+        `Status: <strong style="color:${statusColor(f.FIRE_STATUS)}">${escapeHtml(f.FIRE_STATUS || "—")}</strong><br/>` +
+        `Size: ${ha} ha · Distance: ${f.dist.toFixed(1)} km · Bearing: ${f.brg.toFixed(0)}°<br/>` +
+        `Location: ${f.lat.toFixed(5)}, ${f.lon.toFixed(5)}` +
+        `</div>`;
+      li.addEventListener("mouseenter", () => { hoverIdx = i; });
+      li.addEventListener("mouseleave", () => { hoverIdx = -1; });
+      el.fireList.appendChild(li);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function parseFeatures(geojson) {
+    const features = (geojson && geojson.features) || [];
+    return features.map((ft) => {
+      const p = ft.properties || {};
+      let lat = p.LATITUDE;
+      let lon = p.LONGITUDE;
+      if ((lat == null || lon == null) && ft.geometry && ft.geometry.coordinates) {
+        lon = ft.geometry.coordinates[0];
+        lat = ft.geometry.coordinates[1];
+      }
+      return {
+        LABEL: p.LABEL,
+        FIRE_NUMBER: p.FIRE_NUMBER,
+        FIRE_STATUS: p.FIRE_STATUS,
+        AREA_ESTIMATE: p.AREA_ESTIMATE,
+        LATITUDE: Number(lat),
+        LONGITUDE: Number(lon),
+      };
+    }).filter((f) => Number.isFinite(f.LATITUDE) && Number.isFinite(f.LONGITUDE));
+  }
+
+  async function fetchFires() {
+    if (TEST_MODE) {
+      fires = TEST_FIRES.map((f) => ({ ...f }));
+      lastFetchOk = true;
+      el.abCount.textContent = String(fires.length) + " (test)";
+      el.lastUpdated.textContent = new Date().toLocaleString("en-CA", {
+        timeZone: "America/Edmonton",
+        hour12: false,
+      }) + " MT (TEST)";
+      el.fetchStatus.textContent = "Using TEST DATA — not the live Alberta feed";
+      el.fetchStatus.className = "status-line err";
+      recomputeNear();
+      renderList();
+      return;
+    }
+
+    el.fetchStatus.textContent = "Fetching Alberta Wildfire feed…";
+    el.fetchStatus.className = "status-line";
+    try {
+      const res = await fetch(API, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      fires = parseFeatures(data);
+      lastFetchOk = true;
+      el.abCount.textContent = String(fires.length);
+      el.lastUpdated.textContent = new Date().toLocaleString("en-CA", {
+        timeZone: "America/Edmonton",
+        hour12: false,
+      }) + " MT";
+      el.fetchStatus.textContent = "Live feed OK · " + fires.length + " active fire(s) in Alberta";
+      el.fetchStatus.className = "status-line ok";
+      recomputeNear();
+      renderList();
+    } catch (err) {
+      lastFetchOk = false;
+      el.fetchStatus.textContent = "Fetch failed: " + (err && err.message ? err.message : err);
+      el.fetchStatus.className = "status-line err";
+      el.abCount.textContent = "error";
+    }
+  }
+
+  // --- Radar drawing ---
+  function drawRadar() {
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const maxR = Math.min(cx, cy) - 18;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // background grid glow
+    ctx.fillStyle = "#050a0e";
+    ctx.beginPath();
+    ctx.arc(cx, cy, maxR + 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // range rings
+    RINGS.forEach((km) => {
+      const r = (km / RADIUS_KM) * maxR;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(46, 230, 109, 0.28)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(46, 230, 109, 0.55)";
+      ctx.font = "11px Segoe UI, sans-serif";
+      ctx.fillText(km + " km", cx + 4, cy - r + 12);
+    });
+
+    // crosshairs
+    ctx.strokeStyle = "rgba(46, 230, 109, 0.2)";
+    ctx.beginPath();
+    ctx.moveTo(cx - maxR, cy);
+    ctx.lineTo(cx + maxR, cy);
+    ctx.moveTo(cx, cy - maxR);
+    ctx.lineTo(cx, cy + maxR);
+    ctx.stroke();
+
+    // cardinal labels
+    ctx.fillStyle = "rgba(138, 155, 176, 0.9)";
+    ctx.font = "12px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("N", cx, cy - maxR + 14);
+    ctx.fillText("S", cx, cy + maxR - 6);
+    ctx.fillText("W", cx - maxR + 12, cy + 4);
+    ctx.fillText("E", cx + maxR - 12, cy + 4);
+    ctx.textAlign = "start";
+
+    // sweep wedge
+    const sweepWidth = Math.PI / 5;
+    const grad = ctx.createConicalGradient
+      ? null
+      : null;
+    // approximate conical with arc wedge + fade
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, maxR, sweep - sweepWidth, sweep, false);
+    ctx.closePath();
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
+    g.addColorStop(0, "rgba(46, 230, 109, 0.35)");
+    g.addColorStop(1, "rgba(46, 230, 109, 0.02)");
+    ctx.fillStyle = g;
+    ctx.fill();
+    // leading edge
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(sweep) * maxR, cy + Math.sin(sweep) * maxR);
+    ctx.strokeStyle = "rgba(46, 230, 109, 0.85)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // fire pings — bearing 0 = north = up; canvas angle 0 = east, so convert
+    near.forEach((f, i) => {
+      const ang = ((f.brg - 90) * Math.PI) / 180; // 0° north → canvas
+      const r = (f.dist / RADIUS_KM) * maxR;
+      const x = cx + Math.cos(ang) * r;
+      const y = cy + Math.sin(ang) * r;
+      const col = statusColor(f.FIRE_STATUS);
+      const highlight = i === hoverIdx;
+
+      // pulse ring when sweep passes
+      const sweepAng = ((sweep % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const pingAng = ((ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      let delta = Math.abs(sweepAng - pingAng);
+      if (delta > Math.PI) delta = Math.PI * 2 - delta;
+      const pulse = delta < 0.25 ? (1 - delta / 0.25) : 0;
+
+      if (pulse > 0 || highlight) {
+        ctx.beginPath();
+        ctx.arc(x, y, 10 + pulse * 14, 0, Math.PI * 2);
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = 0.35 + pulse * 0.5;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.beginPath();
+      ctx.arc(x, y, highlight ? 7 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // label
+      ctx.font = (highlight ? "bold " : "") + "11px Segoe UI, sans-serif";
+      ctx.fillStyle = "#e8eef5";
+      ctx.fillText(f.LABEL || f.FIRE_NUMBER || "?", x + 9, y - 6);
+    });
+
+    // camp center
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#2ee66d";
+    ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    sweep += 0.018;
+    requestAnimationFrame(drawRadar);
+  }
+
+  // Click radar → set camp from polar coords
+  canvas.addEventListener("click", (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (ev.clientX - rect.left) * scaleX;
+    const y = (ev.clientY - rect.top) * scaleY;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const maxR = Math.min(cx, cy) - 18;
+    const dx = x - cx;
+    const dy = y - cy;
+    const rPx = Math.sqrt(dx * dx + dy * dy);
+    if (rPx > maxR) return;
+    const distKm = (rPx / maxR) * RADIUS_KM;
+    // canvas angle: 0 east, CW; convert to bearing from north
+    let brg = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+    if (brg < 0) brg += 360;
+    const dest = destination(camp.lat, camp.lon, distKm, brg);
+    // Click moves the *camp* to that geographic point (re-center radar)
+    el.lat.value = dest.lat.toFixed(5);
+    el.lon.value = dest.lon.toFixed(5);
+    if (!el.campName.value.includes("placeholder") && el.campName.value === DEFAULT.name) {
+      /* keep */
+    }
+    applyCampFromInputs();
+    el.fetchStatus.textContent = "Camp pin moved via radar click · " + dest.lat.toFixed(5) + ", " + dest.lon.toFixed(5);
+    el.fetchStatus.className = "status-line ok";
+  });
+
+  document.getElementById("btnApply").addEventListener("click", () => {
+    if (applyCampFromInputs()) {
+      el.fetchStatus.textContent = "Camp pinned · " + camp.lat.toFixed(5) + ", " + camp.lon.toFixed(5);
+      el.fetchStatus.className = "status-line ok";
+    }
+  });
+  document.getElementById("btnReset").addEventListener("click", () => {
+    el.campName.value = DEFAULT.name;
+    el.lat.value = String(DEFAULT.lat);
+    el.lon.value = String(DEFAULT.lon);
+    applyCampFromInputs();
+  });
+  document.getElementById("btnRefresh").addEventListener("click", () => fetchFires());
+
+  // init
+  applyCampFromInputs();
+  fetchFires();
+  setInterval(fetchFires, REFRESH_MS);
+  requestAnimationFrame(drawRadar);
+
+  // Expose for headless tests
+  window.__radar = {
+    getState: () => ({ camp, fires: fires.length, near: near.map((f) => ({ label: f.LABEL, dist: f.dist, brg: f.brg })), test: TEST_MODE, lastFetchOk }),
+    fetchFires,
+  };
+})();
+  </script>
+</body>
+</html>
