@@ -446,24 +446,24 @@
       <div class="panel">
         <h2>Camp location</h2>
         <label for="campName">Name</label>
-        <input id="campName" type="text" value="Test Camp (placeholder)" />
+        <input id="campName" type="text" value="TEST pin — just outside Hinton, AB (not a real camp)" />
         <div class="row" style="margin-top:10px">
           <div>
             <label for="lat">Latitude</label>
-            <input id="lat" type="number" step="any" value="54.464" />
+            <input id="lat" type="number" step="any" value="53.42" />
           </div>
           <div>
             <label for="lon">Longitude</label>
-            <input id="lon" type="number" step="any" value="-110.182" />
+            <input id="lon" type="number" step="any" value="-117.50" />
           </div>
         </div>
         <div class="btn-row">
           <button class="primary" id="btnApply" type="button">Pin camp</button>
-          <button id="btnReset" type="button">Reset placeholder</button>
+          <button id="btnReset" type="button">Reset TEST pin</button>
           <button id="btnRefresh" type="button">Refresh now</button>
         </div>
         <p class="hint">
-          Default pin is a <strong>placeholder</strong> near Cold Lake, AB — not a real LodgeX camp.
+          Default pin is a <strong>TEST location</strong> just outside Hinton, AB (53.42, −117.50) — <strong>not</strong> a real LodgeX camp. Real camp coordinates remain a plan gap.
           Click the radar to move the pin (maps lat/lon from bearing/distance), or enter coordinates.
         </p>
         <div id="fetchStatus" class="status-line">Loading…</div>
@@ -486,15 +486,15 @@
           loading="lazy"
           referrerpolicy="no-referrer-when-downgrade"
           allowfullscreen
-          src="https://embed.windy.com/embed2.html?lat=54.464&lon=-110.182&detailLat=54.464&detailLon=-110.182&zoom=7&level=surface&overlay=wind&product=ecmwf&menu=&message=false&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1"
+          src="https://embed.windy.com/embed2.html?lat=53.42&lon=-117.50&detailLat=53.42&detailLon=-117.50&zoom=7&level=surface&overlay=wind&product=ecmwf&menu=&message=false&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1"
         ></iframe>
         <div class="radar-scrim" aria-hidden="true"></div>
         <canvas id="radar" width="720" height="720" aria-label="Wildfire radar"></canvas>
-        <div class="camp-label" id="campLabel">Test Camp (placeholder)</div>
+        <div class="camp-label" id="campLabel">TEST pin — outside Hinton, AB</div>
       </div>
       <p class="windy-credit">Wind background: free <a href="https://www.windy.com/" target="_blank" rel="noopener">Windy</a> embed (no API key). Interactive Map Forecast API not used.</p>
       <div class="legend">
-        <span><i style="background:#2ee66d"></i>Camp (placeholder)</span>
+        <span><i style="background:#2ee66d"></i>TEST pin (not a real camp)</span>
         <span><i style="background:#ff4d4d"></i>Out of Control</span>
         <span><i style="background:#f5a524"></i>Being Held</span>
         <span><i style="background:#4da3ff"></i>Under Control / other</span>
@@ -588,7 +588,7 @@
   const RADIUS_KM = 150;
   const RINGS = [25, 50, 100, 150];
   const REFRESH_MS = 5 * 60 * 1000;
-  const DEFAULT = { name: "Test Camp (placeholder)", lat: 54.464, lon: -110.182 };
+  const DEFAULT = { name: "TEST pin — just outside Hinton, AB (not a real camp)", lat: 53.42, lon: -117.50 };
 
   const params = new URLSearchParams(location.search);
   const TEST_MODE = params.get("test") === "1";
@@ -641,15 +641,15 @@
   let lastFetchOk = false;
   let feedStatus = { ab: null, bc: null }; // "ok" | "error" | null
 
-  // --- Test sample fires (relative to default Cold Lake placeholder) ---
+  // --- Test sample fires (relative to default Hinton TEST pin for WHZ demos) ---
   const TEST_FIRES = [
     {
       LABEL: "TEST-OC-01",
       FIRE_NUMBER: "TEST-OC-01",
       FIRE_STATUS: "Out of Control",
       AREA_ESTIMATE: 420.5,
-      LATITUDE: 54.70,
-      LONGITUDE: -110.05,
+      LATITUDE: 53.656,
+      LONGITUDE: -117.368,
       SOURCE: "AB",
     },
     {
@@ -657,8 +657,8 @@
       FIRE_NUMBER: "TEST-BH-02",
       FIRE_STATUS: "Being Held",
       AREA_ESTIMATE: 85,
-      LATITUDE: 54.30,
-      LONGITUDE: -109.75,
+      LATITUDE: 53.256,
+      LONGITUDE: -117.068,
       SOURCE: "AB",
     },
     {
@@ -666,8 +666,8 @@
       FIRE_NUMBER: "TEST-UC-03",
       FIRE_STATUS: "Under Control",
       AREA_ESTIMATE: 12.3,
-      LATITUDE: 54.55,
-      LONGITUDE: -110.55,
+      LATITUDE: 53.506,
+      LONGITUDE: -117.868,
       SOURCE: "AB",
     },
     {
@@ -675,8 +675,8 @@
       FIRE_NUMBER: "TEST-BC-05",
       FIRE_STATUS: "Being Held",
       AREA_ESTIMATE: 210,
-      LATITUDE: 54.20,
-      LONGITUDE: -111.40,
+      LATITUDE: 53.156,
+      LONGITUDE: -118.718,
       SOURCE: "BC",
     },
     {
@@ -684,8 +684,8 @@
       FIRE_NUMBER: "TEST-FAR-04",
       FIRE_STATUS: "Out of Control",
       AREA_ESTIMATE: 900,
-      LATITUDE: 56.0,
-      LONGITUDE: -112.0,
+      LATITUDE: 54.956,
+      LONGITUDE: -119.318,
       SOURCE: "AB",
     },
   ];

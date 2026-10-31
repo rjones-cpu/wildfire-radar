@@ -33,7 +33,7 @@
 
 - WHZ thresholds match site chart: Alert ≥100 km (within 150), L1 50–100, L2 25–50, L3 ≤25.
 - ICS **WILDFIRE RESPONSE CHART** role duties surfaced in Contacts (verbatim). Gap note: **named people/phones blank; role duty text exists**.
-- Still flagged as-is: alternate meeting points TBD; CO recommended-actions table not extractable; laydown plot “needs stars…”; blank Forestry/ECC phones; no camp lat/lon (Cold Lake placeholder).
+- Still flagged as-is: alternate meeting points TBD; CO recommended-actions table not extractable; laydown plot “needs stars…”; blank Forestry/ECC phones; no camp lat/lon (TEST pin just outside Hinton 53.42, −117.50 — not a real camp).
 
 ## Security notes (for SOC 2)
 

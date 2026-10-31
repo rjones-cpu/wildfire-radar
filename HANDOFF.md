@@ -11,7 +11,7 @@
 - **Browser-only** fetch — **no backend**. Public Alberta FeatureServer GeoJSON from:
   - `https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0`
 - **Do not** use the `services.arcgis.com` `Active_Wildfires_Prod_View2` mirror (needs a token).
-- Placeholder camp pin: **Cold Lake area** `54.464, -110.182` (not a real LodgeX camp until coordinates are supplied).
+- Placeholder camp pin: **TEST location just outside Hinton, AB** `53.42, -117.50` (not a real LodgeX camp; real coords still a plan gap).
 - Live GitHub Pages: `https://rjones-cpu.github.io/wildfire-radar/` · repo `rjones-cpu/wildfire-radar`.
 - Intended module for **Smart Lodge** and **CrewSight (Major Projects)**.
 
@@ -54,7 +54,7 @@ Authority boundary: UI surfaces plan actions; **evacuation order remains with TC
 - Forestry Field Center & Industry Liaison **phone fields blank**.
 - TCE ECC / Calgary EOC **numbers not listed** (plan says to post them).
 - Alternate meeting points **TBD by ICs**.
-- **No camp lat/lon** in plan — Cold Lake pin is placeholder.
+- **No camp lat/lon** in plan — default pin is a TEST location just outside Hinton (`53.42, -117.50`), not a real camp.
 - Laydown plot plan note: needs muster stars (no map pins in text).
 - CO “recommended actions” table after the CO note not present as extractable text (AQ response table *is* present).
 

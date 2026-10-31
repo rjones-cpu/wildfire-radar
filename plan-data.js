@@ -439,7 +439,7 @@ window.WILDFIRE_PLAN = {
     "Laydown yard plot plan note in source: \"needs stars site, muster areas added\" — no coordinates or map pins in the document text.",
     "Alternate meeting points: \"to be determined by the incident commanders.\"",
     "Carbon monoxide recommended-actions table referenced but not extractable as text.",
-    "Exact camp/site lat-lon for Karr/DVN not stated in the plan; app keeps a placeholder camp pin (default Cold Lake area) until a real LodgeX camp coordinate is supplied.",
+    "Exact camp/site lat-lon for Karr/DVN not stated in the plan; app keeps a TEST placeholder pin just outside Hinton, AB (53.42, −117.50) until a real LodgeX camp coordinate is supplied. Real camp coords remain a gap.",
     "PowerPoint deck is mostly Alberta/DVN wildfire statistics context; it does not add operational actions, contacts, routes, or distance triggers beyond reinforcing ~150 km landscape context."
   ]
 };
