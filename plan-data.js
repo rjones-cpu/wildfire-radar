@@ -110,7 +110,7 @@ window.WILDFIRE_PLAN = {
     {
       id: "green",
       name: "Green route — Highway 40 to Grande Prairie pipe yard",
-      color: "#2ee66d",
+      color: "#15803d",
       destination: "Grande Prairie pipe yard (check-in with Security)",
       radio: "Can4Main",
       steps: [
@@ -124,7 +124,7 @@ window.WILDFIRE_PLAN = {
     {
       id: "yellow",
       name: "Yellow route — Highway 40 to Grande Cache Mall parking lot",
-      color: "#f5a524",
+      color: "#b45309",
       destination: "Grande Cache Mall parking lot (check-in with Security)",
       radio: "Can4Main",
       steps: [
@@ -138,7 +138,7 @@ window.WILDFIRE_PLAN = {
     {
       id: "red",
       name: "Red route — Forestry Trunk Road Sec #732 to Hinton",
-      color: "#ff4d4d",
+      color: "#b91c1c",
       destination: "Holiday Inn Express parking lot, Hinton (check-in with Security)",
       radio: "Can4main then Lad 1/FTR",
       steps: [

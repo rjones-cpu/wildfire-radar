@@ -15,12 +15,21 @@
       .replace(/'/g, "&#39;");
   }
 
-  /** Allowlisted route swatch colours only (SOC 2 N1). */
-  var ROUTE_COLOR_ALLOWLIST = ["#2ee66d", "#f5a524", "#ff4d4d"];
+  /**
+   * Allowlisted route swatch colours (WCAG ≥3:1 on white/light surfaces).
+   * Legacy bright hex values map to the darkened allowlist entry.
+   */
+  var ROUTE_COLOR_ALLOWLIST = ["#15803d", "#b45309", "#b91c1c"];
+  var ROUTE_COLOR_ALIASES = {
+    "#2ee66d": "#15803d",
+    "#f5a524": "#b45309",
+    "#ff4d4d": "#b91c1c",
+  };
 
   function safeRouteColor(color, fallback) {
-    var fb = fallback == null ? "#8a9bb0" : fallback;
+    var fb = fallback == null ? "#4b5563" : fallback;
     var raw = String(color || "").trim().toLowerCase();
+    if (ROUTE_COLOR_ALIASES[raw]) raw = ROUTE_COLOR_ALIASES[raw];
     for (var i = 0; i < ROUTE_COLOR_ALLOWLIST.length; i++) {
       if (ROUTE_COLOR_ALLOWLIST[i].toLowerCase() === raw) {
         return ROUTE_COLOR_ALLOWLIST[i];

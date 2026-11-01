@@ -65,12 +65,15 @@ assert(escapeHtml("it's") === "it&#39;s", "escape single quote");
 assert(escapeHtml("a&b") === "a&amp;b", "escape &");
 
 // --- safeRouteColor allowlist ---
-assert(safeRouteColor("#2ee66d") === "#2ee66d", "allow green");
-assert(safeRouteColor("#F5A524") === "#f5a524", "allow amber case-insensitive → canonical");
-assert(safeRouteColor("#ff4d4d") === "#ff4d4d", "allow red");
-assert(safeRouteColor("red") === "#8a9bb0", "reject named color");
-assert(safeRouteColor("#000000") === "#8a9bb0", "reject non-allowlisted hex");
-assert(safeRouteColor("expression(alert(1))") === "#8a9bb0", "reject css expression");
+assert(safeRouteColor("#15803d") === "#15803d", "allow WCAG green");
+assert(safeRouteColor("#B45309") === "#b45309", "allow amber case-insensitive → canonical");
+assert(safeRouteColor("#b91c1c") === "#b91c1c", "allow red");
+assert(safeRouteColor("#2ee66d") === "#15803d", "legacy green maps to WCAG");
+assert(safeRouteColor("#f5a524") === "#b45309", "legacy amber maps to WCAG");
+assert(safeRouteColor("#ff4d4d") === "#b91c1c", "legacy red maps to WCAG");
+assert(safeRouteColor("red") === "#4b5563", "reject named color");
+assert(safeRouteColor("#000000") === "#4b5563", "reject non-allowlisted hex");
+assert(safeRouteColor("expression(alert(1))") === "#4b5563", "reject css expression");
 
 if (failed) {
   console.error("\n" + failed + " failure(s)");
