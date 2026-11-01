@@ -372,6 +372,14 @@ assert(indexHtmlMap.indexOf("windForecast") >= 0, "forecast slider present");
 assert(indexHtmlMap.indexOf("America/Edmonton") >= 0 && indexHtmlMap.indexOf("America/Vancouver") >= 0, "forecast labels use MT + PT zones");
 assert(indexHtmlMap.indexOf("formatUtcTooltip") >= 0, "UTC kept in tooltip helper");
 assert(indexHtmlMap.indexOf("map-mock-sat") >= 0, "mock satellite fallback class for local contrast");
+assert(indexHtmlMap.indexOf("SIMULATED basemap") >= 0, "SIMULATED basemap label present in source");
+assert(indexHtmlMap.indexOf("dataset.real") >= 0, "credit.dataset.real save path");
+assert(indexHtmlMap.indexOf("applySimulatedBasemapCredit") >= 0, "applySimulatedBasemapCredit helper");
+assert(indexHtmlMap.indexOf("restoreRealBasemapCredit") >= 0, "restoreRealBasemapCredit on Maps success");
+assert(indexHtmlMap.indexOf("fillFallbackBanner") >= 0 && indexHtmlMap.indexOf('createElement("strong")') >= 0, "N21 fallback uses DOM nodes not innerHTML for banner body");
+assert(indexHtmlMap.indexOf("clearStationPaintLoop") >= 0, "N32 clearStationPaintLoop");
+assert(indexHtmlMap.indexOf("clampBbox") >= 0, "N33 clampBbox helper");
+
 assert(indexHtmlMap.indexOf("fromLatLngToContainerPixel") >= 0, "OverlayView container pixel projection");
 assert(indexHtmlMap.indexOf("restoreOverlayNodes") >= 0, "Maps fallback restores wind canvas");
 assert(indexHtmlMap.indexOf("__radarOverlay") >= 0, "OverlayView projection helper attached");
@@ -462,6 +470,15 @@ const secSrc = fs.readFileSync(path.join(root, "radar-security.js"), "utf8");
 assert(secSrc.indexOf("/^-?\\d{1,3}(\\.\\d{1,8})?$/") >= 0, "strict regex unchanged (1–8 decimals)");
 
 
+
+
+// --- SOC 2 B1 runtime: gm_authFailure labels SIMULATED basemap ---
+const { spawnSync } = require("child_process");
+const pyTest = path.join(__dirname, "mock-sat-label.test.py");
+const py = spawnSync("python3", [pyTest], { encoding: "utf8", timeout: 120000 });
+if (py.stdout) process.stdout.write(py.stdout);
+if (py.stderr) process.stderr.write(py.stderr);
+assert(py.status === 0, "mock-sat-label runtime gm_authFailure test exit 0");
 
 if (failed) {
   console.error("\n" + failed + " failure(s)");

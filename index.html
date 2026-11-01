@@ -935,6 +935,7 @@
     togStations: document.getElementById("togStations"),
     togSmoke: document.getElementById("togSmoke"),
     stamp: document.getElementById("mapTimestamp"),
+    credit: document.querySelector(".map-credit"),
     forecast: document.getElementById("windForecast"),
     forecastLabel: document.getElementById("windForecastLabel"),
     windStatus: document.getElementById("windStatus"),
@@ -978,6 +979,53 @@
     elBg.smoke = document.getElementById("bgSmoke");
   }
 
+  function applySimulatedBasemapCredit() {
+    const credit = elBg.credit || document.querySelector(".map-credit");
+    if (!credit) return;
+    if (!credit.dataset.real) {
+      credit.dataset.real = credit.textContent || "";
+    }
+    credit.textContent =
+      "Background: SIMULATED basemap (not real satellite imagery). Google Maps unavailable.";
+  }
+
+  function restoreRealBasemapCredit() {
+    const credit = elBg.credit || document.querySelector(".map-credit");
+    if (!credit) return;
+    if (credit.dataset.real) {
+      credit.textContent = credit.dataset.real;
+    }
+  }
+
+  function fillFallbackBanner(reason) {
+    if (!elBg.fallback) return;
+    elBg.fallback.classList.add("show");
+    let box = elBg.fallback.querySelector("div");
+    if (!box) {
+      box = document.createElement("div");
+      elBg.fallback.appendChild(box);
+    }
+    // N21: build with DOM nodes / textContent (no innerHTML).
+    while (box.firstChild) box.removeChild(box.firstChild);
+    const strong = document.createElement("strong");
+    strong.textContent = "Google Maps could not load — SIMULATED basemap";
+    box.appendChild(strong);
+    box.appendChild(document.createElement("br"));
+    const line1 = document.createTextNode(
+      "The background map needs a valid Maps JavaScript API key with this page’s referrer allowed (production: https://rjones-cpu.github.io/*). Localhost often shows a billing or referrer error."
+    );
+    box.appendChild(line1);
+    if (reason) {
+      box.appendChild(document.createTextNode(" " + String(reason)));
+    }
+    box.appendChild(document.createElement("br"));
+    box.appendChild(
+      document.createTextNode(
+        "SIMULATED basemap — wind particles / smoke overlays and the radar still work without the map tiles."
+      )
+    );
+  }
+
   function showMapFallback(reason) {
     gmapFailed = true;
     gmapReady = false;
@@ -988,17 +1036,12 @@
     const bgRoot = document.getElementById("bgMap");
     if (bgRoot) bgRoot.classList.add("map-mock-sat");
     restoreOverlayNodes();
-    if (elBg.fallback) {
-      elBg.fallback.classList.add("show");
-      const detail = reason ? (" " + String(reason)) : "";
-      elBg.fallback.querySelector("div").innerHTML =
-        "<strong>Google Maps could not load</strong><br/>" +
-        "The background map needs a valid Maps JavaScript API key with this page’s referrer allowed " +
-        "(production: <code>https://rjones-cpu.github.io/*</code>). Localhost often shows a billing or referrer error." +
-        detail +
-        "<br/>Wind particles / smoke overlays and the radar still work without the map tiles.";
+    fillFallbackBanner(reason);
+    applySimulatedBasemapCredit();
+    if (elBg.stamp) {
+      elBg.stamp.textContent =
+        "SIMULATED basemap · Google Maps unavailable · overlays only";
     }
-    if (elBg.stamp) elBg.stamp.textContent = "Google Maps unavailable · overlays only";
     // Particles can still run over the dark fallback using equirectangular projection.
     ensureWindField();
     if (windGrid) restartWindAnimation();
@@ -1267,6 +1310,29 @@
     return Math.ceil(base * 1.55);
   }
 
+  function clampBbox(box) {
+    if (!box) return null;
+    function clamp(n, lo, hi) {
+      n = Number(n);
+      if (!Number.isFinite(n)) return null;
+      return Math.min(hi, Math.max(lo, n));
+    }
+    let west = clamp(box.west, -180, 180);
+    let east = clamp(box.east, -180, 180);
+    let south = clamp(box.south, -85, 85);
+    let north = clamp(box.north, -85, 85);
+    if (west == null || east == null || south == null || north == null) return null;
+    if (north < south) {
+      const tmp = north;
+      north = south;
+      south = tmp;
+    }
+    // Reject antimeridian / inverted / absurd spans — fall back to camp radius.
+    if (east <= west) return null;
+    if (east - west > 40 || north - south > 30) return null;
+    return { west: west, east: east, south: south, north: north };
+  }
+
   function windCoverBbox(lat, lon) {
     if (gmapReady && gmap && gmap.getBounds) {
       try {
@@ -1276,12 +1342,13 @@
           const sw = b.getSouthWest();
           const padLat = (ne.lat() - sw.lat()) * 0.12;
           const padLon = (ne.lng() - sw.lng()) * 0.12;
-          return {
+          const clamped = clampBbox({
             west: sw.lng() - padLon,
             east: ne.lng() + padLon,
             south: sw.lat() - padLat,
             north: ne.lat() + padLat,
-          };
+          });
+          if (clamped) return clamped;
         }
       } catch (e) { /* fall through */ }
     }
@@ -1403,11 +1470,24 @@
   }
 
   let stationPaintTimer = 0;
+  function clearStationPaintLoop() {
+    if (stationPaintTimer) {
+      window.clearInterval(stationPaintTimer);
+      stationPaintTimer = 0;
+    }
+  }
   function ensureStationPaintLoop() {
+    if (gmapReady) {
+      clearStationPaintLoop();
+      return;
+    }
     if (stationPaintTimer) return;
     stationPaintTimer = window.setInterval(function () {
       if (!(elBg.togStations && elBg.togStations.checked)) return;
-      if (gmapReady) return;
+      if (gmapReady) {
+        clearStationPaintLoop();
+        return;
+      }
       drawFallbackStationArrows();
     }, 200);
   }
@@ -1601,9 +1681,12 @@
         backgroundColor: "#0b1220",
       });
       gmapReady = true;
+      gmapFailed = false;
       const bgRoot = document.getElementById("bgMap");
       if (bgRoot) bgRoot.classList.remove("map-mock-sat");
       if (elBg.fallback) elBg.fallback.classList.remove("show");
+      restoreRealBasemapCredit();
+      clearStationPaintLoop();
       syncGoogleMarkers();
       attachMapsOverlayHelper();
     } catch (err) {
