@@ -22,21 +22,28 @@ python3 -m http.server 8765
 
 Each ping is tagged **AB** or **BC**. Feeds load in parallel; one failure keeps the other. Same 150 km range and WHZ plan triggers apply to the nearest fire of either province.
 
-## Background map (wind / smoke)
+## Background map (satellite + wind direction)
 
-Full-page map behind the transparent radar (no third-party wind embed):
+Full-page map behind the transparent radar (no third-party wind embed). Default view is **NASA GIBS true-colour satellite land** with **ECCC RDPS wind arrows** (`WINDARROWKMH`) only — HRDPS WindSpeed / WDIR colour washes are **not** shown (Ralph, 2026-10-31).
 
-| Layer | Source | Id |
-|-------|--------|----|
-| Basemap | NASA GIBS WMS | `MODIS_Terra_CorrectedReflectance_TrueColor` |
-| Wind speed | ECCC MSC GeoMet WMS | `HRDPS-WEonG_2.5km_WindSpeed` / `WINDSPEEDKMH` |
-| Wind direction | ECCC MSC GeoMet WMS | `HRDPS-WEonG_2.5km_WindDir` / `WDIR6` |
-| Smoke (toggle) | NASA GIBS WMS | `OMPS_Aerosol_Index` |
+| Layer | Source | Id | Default |
+|-------|--------|----|---------|
+| Basemap (satellite) | NASA GIBS WMS | `MODIS_Terra_CorrectedReflectance_TrueColor` | on |
+| Wind direction (arrows) | ECCC MSC GeoMet WMS | `RDPS_10km_Winds_10m` / `WINDARROWKMH` | on (toggle) |
+| Smoke | NASA GIBS WMS | `OMPS_Aerosol_Index` | off (toggle) |
 
 - Endpoints: `https://geo.weather.gc.ca/geomet` · `https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi`
-- **ECCC:** commercial use allowed; attribute **Data Source: Environment and Climate Change Canada**; no bulk tile scraping; contact if ≥86,400 requests/day. This app uses infrequent GetMap images (≈30 min refresh).
+- **ECCC:** commercial use allowed; attribute **Data Source: Environment and Climate Change Canada**; no bulk tile scraping; contact if at least 86,400 requests/day. This app uses infrequent GetMap images (about 30 min refresh).
 - **GIBS:** acknowledge NASA GIBS / ESDIS; no NASA endorsement implied.
-- URL builders live in `map-layers.js`.
+- URL builders live in `map-layers.js` (`buildEcccWindSpeedUrl` remains for tests but is unused by the page).
+
+## Licences and disclaimer
+
+- Contains information licensed under the [Open Government Licence – British Columbia](https://www2.gov.bc.ca/gov/content/data/policy-standards/data-policies/open-data/open-government-licence-bc).
+- Contains information licensed under the [Open Government Licence – Alberta](https://open.alberta.ca/licence).
+- This page is **not** an official BC Wildfire Service or Alberta Wildfire product and is **not** endorsed by either government.
+- Fire data is for reference only, is not guaranteed accurate, and locations are approximate. It is not for insurance or risk decisions. See the [BC Wildfire Service disclaimer](https://www2.gov.bc.ca/gov/content/safety/wildfire-status/about-bcws/disclaimer).
+- No provincial logos are used on this page.
 
 ## Plan data (WHZ only in UI)
 

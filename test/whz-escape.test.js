@@ -178,7 +178,7 @@ assert(MAP_LAYERS && typeof MAP_LAYERS.buildEcccWindSpeedUrl === "function", "MA
 assert(MAP_LAYERS.ECCC_WMS === "https://geo.weather.gc.ca/geomet", "ECCC endpoint");
 assert(MAP_LAYERS.GIBS_WMS.indexOf("gibs.earthdata.nasa.gov") >= 0, "GIBS endpoint");
 assert(MAP_LAYERS.LAYERS.ecccWindSpeed === "HRDPS-WEonG_2.5km_WindSpeed", "wind speed layer id");
-assert(MAP_LAYERS.LAYERS.ecccWindDir === "HRDPS-WEonG_2.5km_WindDir", "wind dir layer id");
+assert(MAP_LAYERS.LAYERS.ecccWindDir === "RDPS_10km_Winds_10m", "wind dir layer id (RDPS arrows)");
 assert(MAP_LAYERS.LAYERS.gibsBase === "MODIS_Terra_CorrectedReflectance_TrueColor", "GIBS base layer");
 assert(MAP_LAYERS.LAYERS.gibsSmoke === "OMPS_Aerosol_Index", "GIBS smoke layer");
 assert(MAP_LAYERS.MAP_REFRESH_MS === 30 * 60 * 1000, "30 min map refresh");
@@ -192,7 +192,7 @@ assert(windUrl.indexOf("CRS=EPSG%3A3857") >= 0 || windUrl.indexOf("CRS=EPSG:3857
 assert(windUrl.indexOf("TIME=2026-11-01T01%3A00%3A00Z") >= 0 || windUrl.indexOf("TIME=2026-11-01T01:00:00Z") >= 0, "wind URL time");
 assert(windUrl.indexOf("embed.windy.com") < 0, "no windy in wind URL");
 const dirUrl = MAP_LAYERS.buildEcccWindDirUrl({ lat: 53.42, lon: -117.5, width: 512, height: 512, time: "2026-11-01T01:00:00Z" });
-assert(dirUrl.indexOf("HRDPS-WEonG_2.5km_WindDir") >= 0 && dirUrl.indexOf("WDIR6") >= 0, "wind dir URL");
+assert(dirUrl.indexOf("RDPS_10km_Winds_10m") >= 0 && dirUrl.indexOf("WINDARROWKMH") >= 0, "wind dir URL arrows");
 const gibsDay = MAP_LAYERS.gibsDateUTC(new Date(Date.UTC(2026, 10, 1))); // Nov 1 → Oct 31
 assert(gibsDay === "2026-10-31", "gibsDateUTC yesterday got " + gibsDay);
 const baseUrl = MAP_LAYERS.buildGibsBaseUrl({ lat: 53.42, lon: -117.5, width: 640, height: 640, time: "2026-10-31" });
@@ -202,7 +202,7 @@ assert(baseUrl.indexOf("TIME=2026-10-31") >= 0, "base TIME");
 const smokeUrl = MAP_LAYERS.buildGibsSmokeUrl({ lat: 53.42, lon: -117.5, width: 640, height: 640, time: "2026-10-31" });
 assert(smokeUrl.indexOf("OMPS_Aerosol_Index") >= 0, "smoke layer in URL");
 const capUrl = MAP_LAYERS.buildEcccCapabilitiesUrl();
-assert(capUrl.indexOf("GetCapabilities") >= 0 && capUrl.indexOf("HRDPS-WEonG_2.5km_WindSpeed") >= 0, "capabilities URL");
+assert(capUrl.indexOf("GetCapabilities") >= 0 && capUrl.indexOf("RDPS_10km_Winds_10m") >= 0, "capabilities URL defaults to RDPS winds");
 const parsed = MAP_LAYERS.parseEcccDefaultTime('<Dimension name="time" units="ISO8601" default="2026-11-01T01:00:00Z" nearestValue="0">x</Dimension>');
 assert(parsed === "2026-11-01T01:00:00Z", "parseEcccDefaultTime");
 const indexHtmlMap = fs.readFileSync(path.join(root, "index.html"), "utf8");
@@ -224,7 +224,37 @@ assert(indexHtmlMap.indexOf("btnRefresh") >= 0, "refresh button retained");
 assert(indexHtmlMap.indexOf("whzLevelBadge") >= 0 && indexHtmlMap.indexOf("computeWhzLevel") >= 0, "WHZ banner + compute kept");
 assert(indexHtmlMap.indexOf("function setCamp") >= 0, "setCamp present");
 
+
 assert(indexHtmlMap.indexOf("togSmoke") >= 0 && indexHtmlMap.indexOf("MAP_LAYERS") >= 0, "smoke toggle / map layers kept");
+
+// --- Satellite + wind direction only (no WindSpeed colour wash) ---
+assert(indexHtmlMap.indexOf("bgWindSpeed") < 0, "no bgWindSpeed element");
+assert(indexHtmlMap.indexOf("buildEcccWindSpeedUrl") < 0, "page does not load WindSpeed URL");
+assert(indexHtmlMap.indexOf("WINDSPEEDKMH") < 0, "no WINDSPEEDKMH in page");
+assert(indexHtmlMap.indexOf("WDIR6") < 0 && indexHtmlMap.indexOf("HRDPS-WEonG_2.5km_WindDir") < 0, "no WDIR6 colour style in page");
+assert(indexHtmlMap.indexOf("bgWindDir") >= 0 && indexHtmlMap.indexOf("buildEcccWindDirUrl") >= 0, "WindDir layer kept");
+assert(indexHtmlMap.indexOf("Wind direction (ECCC RDPS arrows)") >= 0, "wind toggle labeled RDPS arrows");
+assert(/<input type="checkbox" id="togSmoke"[^>]*>/.test(indexHtmlMap) && !/<input type="checkbox" id="togSmoke"[^>]*\bchecked\b/.test(indexHtmlMap), "smoke off by default");
+assert(/<input type="checkbox" id="togWind"[^>]*\bchecked\b/.test(indexHtmlMap), "wind direction on by default");
+assert(indexHtmlMap.indexOf("img-src 'self' data: https://geo.weather.gc.ca https://gibs.earthdata.nasa.gov") >= 0, "CSP img-src hosts unchanged");
+
+// --- Open Government licences + disclaimer ---
+assert(indexHtmlMap.indexOf("open-government-licence-bc") >= 0, "BC OGL link");
+assert(indexHtmlMap.indexOf("open.alberta.ca/licence") >= 0, "AB OGL href");
+assert(indexHtmlMap.indexOf("Open Government Licence") >= 0 && indexHtmlMap.indexOf("British Columbia") >= 0, "BC OGL wording");
+assert(indexHtmlMap.indexOf("Open Government Licence") >= 0 && indexHtmlMap.indexOf("Alberta") >= 0, "AB OGL wording");
+assert(indexHtmlMap.indexOf("official BC Wildfire Service or Alberta Wildfire") >= 0, "not official product line");
+assert(indexHtmlMap.indexOf("not for insurance or risk decisions") >= 0, "insurance disclaimer");
+assert(indexHtmlMap.indexOf("about-bcws/disclaimer") >= 0, "BCWS disclaimer link");
+const readmeTxt = fs.readFileSync(path.join(root, "README.md"), "utf8");
+assert(readmeTxt.indexOf("open-government-licence-bc") >= 0 && readmeTxt.indexOf("open.alberta.ca/licence") >= 0, "README has OGL links");
+assert(/WindSpeed[\s\S]{0,80}not/i.test(readmeTxt) || /not[\s\S]{0,80}WindSpeed/i.test(readmeTxt), "README notes WindSpeed not shown");
+
+// footer link contrast on 0.94 white over #000
+const footPanel = compositeWhiteOver(0.94, "#000000");
+assert(contrastRatio("142033", footPanel) >= 4.5, "footer text #142033 >=4.5:1");
+assert(contrastRatio("0b4f8a", footPanel) >= 4.5, "footer link #0b4f8a >=4.5:1 (got " + contrastRatio("0b4f8a", footPanel).toFixed(2) + ")");
+
 
 // --- SOC 2 B1: computed pins must toFixed(5) before setCamp (c740b3c regression) ---
 const rawFloat = 53.64198460122583; // 14 decimals — String(rawFloat) fails parseStrictDecimal

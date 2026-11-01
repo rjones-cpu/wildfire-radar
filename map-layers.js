@@ -4,6 +4,8 @@
  * - ECCC GeoMet: commercial use allowed; attribution "Data Source: Environment and Climate Change Canada";
  *   no bulk tile scraping; contact if ≥86,400 req/day.
  * - NASA GIBS: required acknowledgment; no NASA endorsement implied.
+ * UI default (Ralph 2026-10-31): GIBS true-colour satellite + RDPS wind arrows (WINDARROWKMH).
+ * HRDPS WindSpeed / WDIR colour washes are NOT loaded in the page.
  */
 (function (g) {
   "use strict";
@@ -13,10 +15,12 @@
 
   /** Verified layer ids (GetCapabilities / GetMap probed 2026-10-31). */
   var LAYERS = {
+    // WindSpeed colour wash kept as builder-only (not used by the page).
     ecccWindSpeed: "HRDPS-WEonG_2.5km_WindSpeed",
-    ecccWindDir: "HRDPS-WEonG_2.5km_WindDir",
     ecccWindSpeedStyle: "WINDSPEEDKMH",
-    ecccWindDirStyle: "WDIR6",
+    // Transparent wind arrows over satellite (WDIR* styles are opaque colour fields).
+    ecccWindDir: "RDPS_10km_Winds_10m",
+    ecccWindDirStyle: "WINDARROWKMH",
     gibsBase: "MODIS_Terra_CorrectedReflectance_TrueColor",
     gibsSmoke: "OMPS_Aerosol_Index",
   };
@@ -140,7 +144,7 @@
       SERVICE: "WMS",
       VERSION: "1.3.0",
       REQUEST: "GetCapabilities",
-      LAYER: layer || LAYERS.ecccWindSpeed,
+      LAYER: layer || LAYERS.ecccWindDir,
     });
     return ECCC_WMS + "?" + q.toString();
   }

@@ -53,10 +53,14 @@
       object-fit: cover;
       display: block;
     }
-    .bg-map img#bgBase { opacity: 1; z-index: 0; }
-    .bg-map img#bgWindSpeed { opacity: 0.55; z-index: 1; }
-    .bg-map img#bgWindDir { opacity: 0.85; z-index: 2; }
-    .bg-map img#bgSmoke { opacity: 0.65; z-index: 3; }
+    .bg-map img#bgBase { opacity: 1; z-index: 0; } /* NASA GIBS true-colour satellite */
+    .bg-map img#bgWindDir {
+      opacity: 1;
+      z-index: 2;
+      /* Halo so WDIR arrows stay readable on bright/dark satellite land */
+      filter: drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 1.2px #fff) drop-shadow(0 1px 1px rgba(0,0,0,0.55));
+    }
+    .bg-map img#bgSmoke { opacity: 0.55; z-index: 3; }
     .bg-map img.is-off { display: none; }
     .map-controls {
       position: fixed;
@@ -322,13 +326,23 @@
     }
     .test-banner.show { display: block; }
     footer {
-      text-align: center;
-      font-size: 0.7rem;
-      color: #142033;
-      padding: 12px 16px 24px;
-      background: rgba(255, 255, 255, 0.72);
+      text-align: left;
+      font-size: 0.72rem;
+      color: #142033; /* ≥4.5:1 on 0.94 white/#000 */
+      padding: 14px 18px 28px;
+      background: rgba(255, 255, 255, 0.94);
+      line-height: 1.55;
+      max-width: 1400px;
+      margin: 0 auto;
     }
-    footer a { color: #1a5fb4; }
+    footer a { color: #0b4f8a; } /* ≥4.5:1 on footer composite */
+    footer .licence-block {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      color: #142033;
+    }
+    footer .licence-block p { margin: 0 0 6px; }
 
     .whz-banner {
       display: flex;
@@ -377,12 +391,11 @@
 <body>
   <div id="bgMap" class="bg-map" aria-hidden="true">
     <img id="bgBase" alt="" decoding="async" />
-    <img id="bgWindSpeed" alt="" decoding="async" />
     <img id="bgWindDir" alt="" decoding="async" />
     <img id="bgSmoke" class="is-off" alt="" decoding="async" />
   </div>
   <div class="map-controls" role="group" aria-label="Background map layers">
-    <label><input type="checkbox" id="togWind" checked /> Wind (ECCC HRDPS)</label>
+    <label><input type="checkbox" id="togWind" checked /> Wind direction (ECCC RDPS arrows)</label>
     <label><input type="checkbox" id="togSmoke" /> Smoke (NASA GIBS)</label>
     <span class="map-time" id="mapTimestamp">Map layers loading…</span>
   </div>
@@ -426,7 +439,7 @@
         <canvas id="radar" width="720" height="720" aria-label="Wildfire radar"></canvas>
         <div class="camp-label" id="campLabel">TEST pin — outside Hinton, AB</div>
       </div>
-      <p class="map-credit">Background map: ECCC MSC GeoMet WMS wind + NASA GIBS imagery / aerosol index. See footer for licences and attribution.</p>
+      <p class="map-credit">Background: NASA GIBS true-colour satellite + ECCC RDPS wind arrows (no wind-speed / WDIR colour wash). See footer for licences.</p>
       <div class="legend">
         <span><i style="background:#15803d"></i>TEST pin (not a real camp)</span>
         <span><i style="background:#b91c1c"></i>Out of Control</span>
@@ -440,15 +453,24 @@
   </main>
 
   <footer>
-    Fires: Data © Government of Alberta ·
-    <a href="https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0" target="_blank" rel="noopener">AB Active Wildfire Locations</a>
-    · Data © Province of British Columbia / BC Wildfire Service ·
-    <a href="https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0" target="_blank" rel="noopener">BCWS ActiveFires PublicView</a>
-    · Map: <strong>Data Source: Environment and Climate Change Canada</strong>
-    (<a href="https://geo.weather.gc.ca/geomet" target="_blank" rel="noopener">MSC GeoMet</a>; commercial use permitted; no bulk tile scraping; contact if ≥86,400 req/day)
-    · Imagery from NASA’s <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs" target="_blank" rel="noopener">Global Imagery Browse Services (GIBS)</a>, part of NASA’s Earth Science Data and Information System (ESDIS).
-    We acknowledge the use of imagery provided by services from NASA’s GIBS. This product is not endorsed by NASA.
-    · Prototype / local only · WHZ thresholds from site plan extract (`plan-data.js`) · Fire feeds refresh 5 min · Map layers 30 min
+    <p style="margin:0 0 6px">
+      Fires: Data © Government of Alberta ·
+      <a href="https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0" target="_blank" rel="noopener">AB Active Wildfire Locations</a>
+      · Data © Province of British Columbia / BC Wildfire Service ·
+      <a href="https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0" target="_blank" rel="noopener">BCWS ActiveFires PublicView</a>
+      · Map: <strong>Data Source: Environment and Climate Change Canada</strong>
+      (<a href="https://geo.weather.gc.ca/geomet" target="_blank" rel="noopener">MSC GeoMet</a> RDPS wind arrows; commercial use permitted; no bulk tile scraping; contact if ≥86,400 req/day)
+      · Imagery from NASA’s <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs" target="_blank" rel="noopener">Global Imagery Browse Services (GIBS)</a>, part of NASA’s Earth Science Data and Information System (ESDIS).
+      We acknowledge the use of imagery provided by services from NASA’s GIBS. This product is not endorsed by NASA.
+      · Prototype / local only · WHZ thresholds from site plan extract (<code>plan-data.js</code>) · Fire feeds refresh 5 min · Map layers 30 min
+    </p>
+    <div class="licence-block">
+      <p>Contains information licensed under the <a href="https://www2.gov.bc.ca/gov/content/data/policy-standards/data-policies/open-data/open-government-licence-bc" target="_blank" rel="noopener">Open Government Licence – British Columbia</a>.</p>
+      <p>Contains information licensed under the <a href="https://open.alberta.ca/licence" target="_blank" rel="noopener">Open Government Licence – Alberta</a>.</p>
+      <p>This page is <strong>not</strong> an official BC Wildfire Service or Alberta Wildfire product and is <strong>not</strong> endorsed by either government.</p>
+      <p>Fire data is for reference only, is not guaranteed accurate, and locations are approximate. It is not for insurance or risk decisions.
+        See the <a href="https://www2.gov.bc.ca/gov/content/safety/wildfire-status/about-bcws/disclaimer" target="_blank" rel="noopener">BC Wildfire Service disclaimer</a>.</p>
+    </div>
   </footer>
 
   <script src="radar-security.js"></script>
@@ -777,7 +799,6 @@
   let mapLoadGen = 0;
   const elBg = {
     base: document.getElementById("bgBase"),
-    windSpeed: document.getElementById("bgWindSpeed"),
     windDir: document.getElementById("bgWindDir"),
     smoke: document.getElementById("bgSmoke"),
     togWind: document.getElementById("togWind"),
@@ -794,7 +815,6 @@
   function applyLayerVisibility() {
     const windOn = !!(elBg.togWind && elBg.togWind.checked);
     const smokeOn = !!(elBg.togSmoke && elBg.togSmoke.checked);
-    if (elBg.windSpeed) elBg.windSpeed.classList.toggle("is-off", !windOn);
     if (elBg.windDir) elBg.windDir.classList.toggle("is-off", !windOn);
     if (elBg.smoke) elBg.smoke.classList.toggle("is-off", !smokeOn);
   }
@@ -802,7 +822,7 @@
   async function refreshEcccTime() {
     if (!ML) return null;
     try {
-      const url = ML.buildEcccCapabilitiesUrl(ML.LAYERS.ecccWindSpeed);
+      const url = ML.buildEcccCapabilitiesUrl(ML.LAYERS.ecccWindDir);
       const res = await fetch(url, { method: "GET" });
       if (!res.ok) return ecccTime;
       const xml = await res.text();
@@ -823,18 +843,16 @@
     const windTime = ecccTime || undefined;
     const common = { lat: lat, lon: lon, bbox: bbox, width: sz.w, height: sz.h };
     const baseUrl = ML.buildGibsBaseUrl(Object.assign({}, common, { time: gibsDay }));
-    const windSpeedUrl = ML.buildEcccWindSpeedUrl(Object.assign({}, common, { time: windTime }));
     const windDirUrl = ML.buildEcccWindDirUrl(Object.assign({}, common, { time: windTime }));
     const smokeUrl = ML.buildGibsSmokeUrl(Object.assign({}, common, { time: gibsDay }));
     if (elBg.base) elBg.base.src = baseUrl;
-    if (elBg.windSpeed) elBg.windSpeed.src = windSpeedUrl;
     if (elBg.windDir) elBg.windDir.src = windDirUrl;
     if (elBg.smoke) elBg.smoke.src = smokeUrl;
     applyLayerVisibility();
     if (elBg.stamp) {
       const windLabel = windTime ? windTime.replace("T", " ").replace(/:00Z$/, "Z") : "—";
       elBg.stamp.textContent =
-        "Base/smoke (GIBS): " + gibsDay + " UTC · Wind (ECCC HRDPS): " + windLabel +
+        "Satellite (GIBS): " + gibsDay + " UTC · Wind arrows (ECCC RDPS): " + windLabel +
         " · ~" + ML.DEFAULT_RADIUS_KM + " km extent";
     }
   }

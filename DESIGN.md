@@ -13,7 +13,7 @@ Add-on for LodgeX **Smart Lodge** and **CrewSight (Major Projects)**. Prototype 
 - Site plan extract in `plan-data.js` (from `site-specific-plan.docx` / `.pptx`): WHZ distance chart, muster (Road 24 laydown), green/yellow/red routes, evacuation roles, **WILDFIRE RESPONSE CHART ICS role duties (verbatim)**, AQ visibility table, resource list, documented gaps.
 - Live knowledge: Alberta Wildfire FeatureServer layer 0 + BCWS `BCWS_ActiveFires_PublicView` FeatureServer/0 (fire number/label, status, size ha, lat/lon).
 - Explicit non-knowledge: blank forestry phone fields, missing ECC/EOC numbers, blank response-team **names/phones** (duty text exists), plot-plan coordinates, alternate meeting points TBD, CO actions table — listed under Plan gaps, never fabricated.
-- Wind / smoke context: full-page background from **ECCC MSC GeoMet WMS** (HRDPS wind speed + direction) and **NASA GIBS** (MODIS true-colour base + OMPS aerosol index smoke overlay), centred on the camp pin (~160 km extent).
+- Wind / smoke context: full-page **NASA GIBS** MODIS true-colour satellite base + **ECCC RDPS wind arrows** (`RDPS_10km_Winds_10m` / `WINDARROWKMH`; HRDPS WindSpeed/WDIR colour washes removed from UI). Optional OMPS smoke overlay (off by default). Centred on the camp pin (~160 km extent).
 
 ## 3. Tools
 
@@ -23,7 +23,7 @@ Add-on for LodgeX **Smart Lodge** and **CrewSight (Major Projects)**. Prototype 
 | BCWS ActiveFires PublicView query (GeoJSON) | Read-only fetch of active BC fires (`FIRE_STATUS <> 'Out'`) |
 | Haversine + bearing | Distance/bearing from camp pin to each fire |
 | `computeWhzLevel(nearestKm)` | Map distance → Alert / L1 / L2 / L3 per plan chart |
-| ECCC MSC GeoMet WMS (`geo.weather.gc.ca/geomet`) | HRDPS-WEonG wind speed + WindDir GetMap images; recenters with camp |
+| ECCC MSC GeoMet WMS (`geo.weather.gc.ca/geomet`) | RDPS **Winds_10m** GetMap (`WINDARROWKMH` arrows); recenters with camp; WindSpeed/WDIR colour washes not shown |
 | NASA GIBS WMS (`gibs.earthdata.nasa.gov`) | MODIS Terra corrected reflectance basemap + OMPS aerosol index smoke overlay |
 | Local UI panels | WHZ banner, fires-within-150 km list, radar; plan detail panels removed from UI |
 | `?test=1` | Offline sample fires for demos/tests (not live feeds) |
@@ -70,7 +70,7 @@ No write tools, no SMS/email send. Map imagery: ECCC GeoMet + NASA GIBS only (no
 ## 8. Communication
 
 - UI: WHZ banner (live), fires list + refresh, radar; **no** camp-location widget and **no** site wildfire plan panel.
-- Radar rings at 25 / 50 / 100 / 150 km aligned to WHZ chart + monitor radius; ECCC/GIBS map under semi-transparent overlays; wind/smoke toggles + timestamp.
+- Radar rings at 25 / 50 / 100 / 150 km aligned to WHZ chart + monitor radius; GIBS satellite + ECCC wind-direction arrows; smoke toggle (off by default) + timestamp.
 - Footer cites AB + BC fire feeds; **Data Source: Environment and Climate Change Canada**; NASA GIBS acknowledgment (no NASA endorsement).
 - Human-readable MT timestamps (`America/Edmonton`).
 - Agent-to-agent: status + screenshot paths reported for Ralph’s review; no production blast.
