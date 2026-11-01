@@ -250,6 +250,9 @@ assert(/apiKey\s*:/.test(mapsCfg) && mapsCfg.indexOf("AIza") >= 0, "maps-config 
 assert(mapsCfg.indexOf("referrer-restricted") >= 0 || mapsCfg.indexOf("rjones-cpu.github.io") >= 0, "maps-config notes referrer restriction");
 const gl = fs.readFileSync(path.join(root, ".gitleaks.toml"), "utf8");
 assert(gl.indexOf("maps-config") >= 0 && gl.toLowerCase().indexOf("referrer") >= 0, "gitleaks allowlists browser Maps key");
+assert(/\[extend\]/.test(gl) && /useDefault\s*=\s*true/.test(gl), "gitleaks extends default rules (SOC 2 B1)");
+assert(/\[allowlist\]/.test(gl), "gitleaks has [allowlist] section");
+assert(indexHtmlMap.indexOf("unsafe-eval") >= 0 && indexHtmlMap.indexOf("worker-src blob:") >= 0, "CSP Maps widenings present");
 assert(indexHtmlMap.indexOf("https://*.googleapis.com") >= 0 && indexHtmlMap.indexOf("https://*.gstatic.com") >= 0, "CSP img-src includes Google tile hosts");
 assert(indexHtmlMap.indexOf("geo.weather.gc.ca") >= 0 && indexHtmlMap.indexOf("gibs.earthdata.nasa.gov") >= 0, "CSP img-src keeps ECCC + GIBS");
 assert(indexHtmlMap.indexOf("maps.googleapis.com") >= 0, "CSP script/connect allows maps.googleapis.com");
@@ -266,6 +269,7 @@ assert(indexHtmlMap.indexOf("not for insurance or risk decisions") >= 0, "insura
 assert(indexHtmlMap.indexOf("about-bcws/disclaimer") >= 0, "BCWS disclaimer link");
 const readmeTxt = fs.readFileSync(path.join(root, "README.md"), "utf8");
 assert(readmeTxt.indexOf("open-government-licence-bc") >= 0 && readmeTxt.indexOf("open.alberta.ca/licence") >= 0, "README has OGL links");
+assert(/residual|unsafe-eval/i.test(readmeTxt), "README documents CSP residual XSS risk");
 assert(/WindSpeed[\s\S]{0,80}not/i.test(readmeTxt) || /not[\s\S]{0,80}WindSpeed/i.test(readmeTxt), "README notes WindSpeed not shown");
 
 // footer link contrast on 0.94 white over #000

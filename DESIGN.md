@@ -52,7 +52,8 @@ No write tools, no SMS/email send. Basemap: Google Maps hybrid. Overlays: ECCC G
 - Never invent plan actions, phone numbers, or muster coordinates.
 - Never touch live staging1 (`reservations1.lodgex.ca`), camp-reservations staging branch, or campinspectors.
 - Fire data origins: Alberta mimas FeatureServer/0 + BCWS ActiveFires PublicView only.
-- Maps browser key lives in `maps-config.js` (referrer-restricted to github.io); ECCC GeoMet + GIBS overlays are public WMS with no auth headers.
+- Maps browser key lives in `maps-config.js` (referrer-restricted to github.io); ECCC GeoMet + GIBS overlays are public WMS with no auth headers. `.gitleaks.toml` extends default rules (`useDefault = true`) and allowlists only that browser-key file.
+- **CSP note (known residual risk):** Google Maps forced a wider CSP (`'unsafe-eval'`, Google host wildcards, `frame-src https://*.google.com`, `worker-src blob:`). Nonce-based strict CSP is not practical on static GitHub Pages, so residual XSS risk remains versus a nonce policy.
 - No user content posted to any server; camp coordinates stay in the browser.
 - Prototype badge; not an automatic evacuation authority.
 - WHZ Level 2 source cell text “25 km 50 km” documented as 25–50 km from chart order — not silently altered beyond that clarification.

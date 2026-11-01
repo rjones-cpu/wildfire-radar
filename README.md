@@ -37,6 +37,8 @@ Full-page **Google Maps** hybrid basemap behind the transparent radar (Maps Java
 - ECCC GeoMet: attribute **Data Source: Environment and Climate Change Canada**; light GetMap refresh (~30 min). HRDPS **WindSpeed** colour wash is **not** shown.
 - GIBS smoke (optional): NASA GIBS acknowledgment; no NASA endorsement.
 - URL builders: `map-layers.js`. Config: `maps-config.js`.
+- **CSP note (known residual risk):** enabling Google Maps required widening the page CSP (`script-src` includes `'unsafe-eval'` plus `maps.googleapis.com` / `maps.gstatic.com` / `blob:`; `img-src`/`connect-src` allow Google wildcards; `frame-src https://*.google.com`; `worker-src blob:`). Nonce-based strict CSP is not practical on static GitHub Pages (no server to mint nonces per response), so XSS risk is higher than a nonce CSP. Revisit if hosting moves behind a server that can emit nonces.
+- **gitleaks:** `.gitleaks.toml` uses `[extend] useDefault = true` so default rules stay active, and allowlists only `maps-config.js` (referrer-restricted Maps browser key).
 
 ## Licences and disclaimer
 
