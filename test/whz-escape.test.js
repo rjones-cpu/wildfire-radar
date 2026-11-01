@@ -29,7 +29,7 @@ vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(root, "radar-security.js"), "utf8"), sandbox);
 vm.runInContext(fs.readFileSync(path.join(root, "plan-data.js"), "utf8"), sandbox);
 
-const { escapeHtml, safeRouteColor, computeWhzLevel, WILDFIRE_PLAN } = sandbox;
+const { escapeHtml, safeRouteColor, computeWhzLevel, WILDFIRE_PLAN, validateCampCoords, sanitizeCampName, parseCampQueryParams, pickLiveExampleFire } = sandbox;
 
 assert(typeof computeWhzLevel === "function", "computeWhzLevel exported");
 assert(WILDFIRE_PLAN && WILDFIRE_PLAN.whzLevels.length === 4, "plan levels present");
@@ -74,6 +74,39 @@ assert(safeRouteColor("#ff4d4d") === "#b91c1c", "legacy red maps to WCAG");
 assert(safeRouteColor("red") === "#4b5563", "reject named color");
 assert(safeRouteColor("#000000") === "#4b5563", "reject non-allowlisted hex");
 assert(safeRouteColor("expression(alert(1))") === "#4b5563", "reject css expression");
+
+
+// --- camp URL param validation ---
+assert(typeof validateCampCoords === "function", "validateCampCoords exported");
+assert(validateCampCoords(53.42, -117.5).ok === true, "valid Hinton coords");
+assert(validateCampCoords("91", "0").ok === false, "lat > 90 rejected");
+assert(validateCampCoords("-91", "0").ok === false, "lat < -90 rejected");
+assert(validateCampCoords("0", "181").ok === false, "lon > 180 rejected");
+assert(validateCampCoords("0", "-181").ok === false, "lon < -180 rejected");
+assert(validateCampCoords("abc", "1").ok === false, "non-numeric rejected");
+assert(validateCampCoords(NaN, 0).ok === false, "NaN rejected");
+
+assert(sanitizeCampName('<script>x</script>') === "scriptx/script", "sanitize strips tags");
+assert(sanitizeCampName('  a   b  ') === "a b", "sanitize collapses space");
+assert(sanitizeCampName("", "Fallback") === "Fallback", "sanitize empty → fallback");
+assert(sanitizeCampName("x".repeat(100)).length === 80, "sanitize max 80");
+
+function fakeParams(obj) {
+  return { get: (k) => (Object.prototype.hasOwnProperty.call(obj, k) ? obj[k] : null) };
+}
+const okQ = parseCampQueryParams(fakeParams({ lat: "52.1", lon: "-120.2", name: 'Demo <b>' }), "Camp");
+assert(okQ.ok === true && okQ.lat === 52.1 && okQ.lon === -120.2, "parseCampQueryParams ok");
+assert(okQ.name.indexOf("<") < 0, "parseCampQueryParams name sanitized");
+assert(parseCampQueryParams(fakeParams({ lat: "1" })).ok === false, "parse requires lon");
+assert(parseCampQueryParams(fakeParams({ lat: "99", lon: "1" })).ok === false, "parse rejects bad lat");
+
+const picked = pickLiveExampleFire([
+  { SOURCE: "AB", FIRE_STATUS: "Under Control", LATITUDE: 55, LONGITUDE: -110, FIRE_NUMBER: "A1" },
+  { SOURCE: "BC", FIRE_STATUS: "Being Held", LATITUDE: 52, LONGITUDE: -120, FIRE_NUMBER: "B1" },
+  { SOURCE: "BC", FIRE_STATUS: "Out of Control", LATITUDE: 51, LONGITUDE: -119, FIRE_NUMBER: "B2" },
+]);
+assert(picked && picked.FIRE_NUMBER === "B2", "pickLiveExampleFire prefers BC Out of Control");
+assert(pickLiveExampleFire([]) === null, "pickLiveExampleFire empty → null");
 
 if (failed) {
   console.error("\n" + failed + " failure(s)");

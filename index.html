@@ -463,11 +463,13 @@
         <div class="btn-row">
           <button class="primary" id="btnApply" type="button">Pin camp</button>
           <button id="btnReset" type="button">Reset TEST pin</button>
+          <button id="btnLiveExample" type="button">Live example</button>
           <button id="btnRefresh" type="button">Refresh now</button>
         </div>
         <p class="hint">
           Default pin is a <strong>TEST location</strong> just outside Hinton, AB (53.42, −117.50) — <strong>not</strong> a real LodgeX camp. Real camp coordinates remain a plan gap.
-          Click the radar to move the pin (maps lat/lon from bearing/distance), or enter coordinates.
+          <strong>Live example</strong> pins a clearly labelled EXAMPLE camp ~35 km from a current active fire (live AB/BC feed; prefers BC Out of Control / Being Held).
+          URL params: <code>?lat=&amp;lon=&amp;name=</code> (validated) or <code>?example=1</code>. Click the radar to move the pin, or enter coordinates.
         </p>
         <div id="fetchStatus" class="status-line">Loading…</div>
       </div>
@@ -597,6 +599,8 @@
 
   const params = new URLSearchParams(location.search);
   const TEST_MODE = params.get("test") === "1";
+  const EXAMPLE_MODE = params.get("example") === "1";
+  let exampleAutoPending = EXAMPLE_MODE && !TEST_MODE;
 
   const canvas = document.getElementById("radar");
   const ctx = canvas.getContext("2d");
@@ -881,25 +885,140 @@
   });
 
   function applyCampFromInputs() {
-    const lat = parseFloat(el.lat.value);
-    const lon = parseFloat(el.lon.value);
-    const name = (el.campName.value || "").trim() || DEFAULT.name;
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      el.fetchStatus.textContent = "Invalid lat/lon";
+    const coords = window.validateCampCoords(el.lat.value, el.lon.value);
+    if (!coords.ok) {
+      el.fetchStatus.textContent = coords.error || "Invalid lat/lon";
       el.fetchStatus.className = "status-line err";
       return false;
     }
-    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
-      el.fetchStatus.textContent = "Lat must be −90…90, lon −180…180";
-      el.fetchStatus.className = "status-line err";
-      return false;
-    }
-    camp = { name, lat, lon };
+    const name = window.sanitizeCampName(el.campName.value, DEFAULT.name);
+    el.campName.value = name;
+    camp = { name, lat: coords.lat, lon: coords.lon };
     el.campLabel.textContent = name;
-    updateWindyEmbed(lat, lon);
+    updateWindyEmbed(coords.lat, coords.lon);
     recomputeNear();
     renderList();
     return true;
+  }
+
+  /**
+   * Pin an EXAMPLE camp ~35 km from a live active fire (prefers BC OOC/Held).
+   * Uses current in-memory feed; call after fetch. Returns {ok, fire, distKm, whz} or {ok:false,error}.
+   */
+  function applyLiveExampleFromFeed(fireList) {
+    const list = (fireList || fires).filter(
+      (f) => Number.isFinite(f.LATITUDE) && Number.isFinite(f.LONGITUDE)
+    );
+    if (!list.length) {
+      el.fetchStatus.textContent = "Live example unavailable — no active fires in feed right now.";
+      el.fetchStatus.className = "status-line err";
+      return { ok: false, error: "no fires" };
+    }
+
+    function nearestFrom(lat, lon) {
+      let best = null;
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i];
+        const d = haversineKm(lat, lon, f.LATITUDE, f.LONGITUDE);
+        if (!best || d < best.dist) best = { fire: f, dist: d };
+      }
+      return best;
+    }
+
+    // Prefer BC OOC/Held as the *anchor*, then search bearings so nearest ends ~30–40 km (L2), else L1.
+    const ranked = list.slice().sort((a, b) => {
+      const score = (f) => {
+        const s = String(f.FIRE_STATUS || "").toLowerCase();
+        let n = f.SOURCE === "BC" ? 10 : f.SOURCE === "AB" ? 5 : 0;
+        if (s.includes("out of control")) n += 30;
+        else if (s.includes("being held")) n += 20;
+        else if (s.includes("under control")) n += 5;
+        return n;
+      };
+      return score(b) - score(a);
+    });
+
+    const bearings = [0, 45, 90, 135, 180, 225, 270, 315];
+    const distsTry = [35, 38, 32, 40, 30];
+    let bestPin = null;
+    let bestMeta = null;
+    let bestScore = -1e9;
+
+    function pinScore(nearestDist, anchorIsNearest) {
+      // Prefer 30–40 km (Level 2), then 50–100 (Level 1); avoid ≤25 (L3) when possible.
+      let s = 0;
+      if (nearestDist >= 30 && nearestDist <= 40) s += 100;
+      else if (nearestDist > 25 && nearestDist <= 50) s += 70;
+      else if (nearestDist > 50 && nearestDist <= 100) s += 40;
+      else if (nearestDist > 100 && nearestDist <= 150) s += 10;
+      else if (nearestDist <= 25) s -= 50;
+      if (anchorIsNearest) s += 25;
+      return s;
+    }
+
+    outer: for (const anchor of ranked.slice(0, 12)) {
+      for (const dKm of distsTry) {
+        for (const brg of bearings) {
+          const pin = destination(anchor.LATITUDE, anchor.LONGITUDE, dKm, brg);
+          const n = nearestFrom(pin.lat, pin.lon);
+          if (!n) continue;
+          const anchorIsNearest =
+            (n.fire.FIRE_NUMBER && n.fire.FIRE_NUMBER === anchor.FIRE_NUMBER) ||
+            (n.fire.LATITUDE === anchor.LATITUDE && n.fire.LONGITUDE === anchor.LONGITUDE);
+          const sc = pinScore(n.dist, anchorIsNearest);
+          if (sc > bestScore) {
+            bestScore = sc;
+            bestPin = pin;
+            bestMeta = { anchor, nearest: n };
+          }
+          if (sc >= 120) break outer; // great L2 hit with anchor as nearest
+        }
+      }
+    }
+
+    if (!bestPin || !bestMeta) {
+      el.fetchStatus.textContent = "Live example unavailable — could not place EXAMPLE pin near a fire.";
+      el.fetchStatus.className = "status-line err";
+      return { ok: false, error: "placement failed" };
+    }
+
+    const fire = bestMeta.nearest.fire;
+    const label =
+      "EXAMPLE camp (live) · near " +
+      (fire.SOURCE || "?") + " " +
+      (fire.FIRE_NUMBER || fire.LABEL || fire.INCIDENT_NAME || "fire") +
+      " · not a real LodgeX camp";
+    const name = window.sanitizeCampName(label, "EXAMPLE camp (live)");
+    el.campName.value = name;
+    el.lat.value = bestPin.lat.toFixed(5);
+    el.lon.value = bestPin.lon.toFixed(5);
+    if (!applyCampFromInputs()) return { ok: false, error: "apply failed" };
+    const whz = window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM);
+    const dist = near.length ? near[0].dist : null;
+    el.fetchStatus.textContent =
+      "Live EXAMPLE pinned · driving fire " +
+      (fire.SOURCE || "") + " " + (fire.FIRE_NUMBER || fire.LABEL || "") +
+      " (" + (fire.FIRE_STATUS || "?") + ") · nearest " +
+      (dist != null ? dist.toFixed(1) + " km" : "?") +
+      (whz.level ? " → " + whz.level.name : "");
+    el.fetchStatus.className = "status-line ok";
+    try {
+      const u = new URL(location.href);
+      u.searchParams.delete("test");
+      u.searchParams.delete("example");
+      u.searchParams.set("lat", String(camp.lat));
+      u.searchParams.set("lon", String(camp.lon));
+      u.searchParams.set("name", camp.name);
+      history.replaceState({}, "", u.pathname + u.search);
+    } catch (e) { /* ignore */ }
+    return {
+      ok: true,
+      fire,
+      anchor: bestMeta.anchor,
+      distKm: dist,
+      whz,
+      camp: { ...camp },
+    };
   }
 
   /** Free Windy embed2 iframe — no API key. Recenters wind map on camp pin. */
@@ -1108,6 +1227,10 @@
 
     recomputeNear();
     renderList();
+    if (exampleAutoPending && lastFetchOk) {
+      exampleAutoPending = false;
+      applyLiveExampleFromFeed(fires);
+    }
   }
 
   // --- Radar drawing ---
@@ -1301,9 +1424,30 @@
     applyCampFromInputs();
   });
   document.getElementById("btnRefresh").addEventListener("click", () => fetchFires());
+  document.getElementById("btnLiveExample").addEventListener("click", async () => {
+    el.fetchStatus.textContent = "Loading live feeds for EXAMPLE pin…";
+    el.fetchStatus.className = "status-line";
+    await fetchFires();
+    if (TEST_MODE) {
+      el.fetchStatus.textContent = "Live example needs live feeds — open without ?test=1";
+      el.fetchStatus.className = "status-line err";
+      return;
+    }
+    applyLiveExampleFromFeed(fires);
+  });
 
-  // init
+  // init — optional ?lat=&lon=&name= (validated); default remains Hinton TEST pin
   renderPlanStatic();
+  const fromQuery = window.parseCampQueryParams(params, "Camp from URL");
+  if (fromQuery.ok) {
+    el.campName.value = fromQuery.name;
+    el.lat.value = String(fromQuery.lat);
+    el.lon.value = String(fromQuery.lon);
+  } else {
+    el.campName.value = DEFAULT.name;
+    el.lat.value = String(DEFAULT.lat);
+    el.lon.value = String(DEFAULT.lon);
+  }
   applyCampFromInputs();
   fetchFires();
   setInterval(fetchFires, REFRESH_MS);
@@ -1311,8 +1455,19 @@
 
   // Expose for headless tests
   window.__radar = {
-    getState: () => ({ camp, fires: fires.length, ab: fires.filter((f) => f.SOURCE === "AB").length, bc: fires.filter((f) => f.SOURCE === "BC").length, near: near.map((f) => ({ label: f.FIRE_NUMBER || f.LABEL, dist: f.dist, brg: f.brg, status: f.FIRE_STATUS, source: f.SOURCE })), test: TEST_MODE, lastFetchOk, feedStatus, whz: window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM) }),
+    getState: () => ({
+      camp,
+      fires: fires.length,
+      ab: fires.filter((f) => f.SOURCE === "AB").length,
+      bc: fires.filter((f) => f.SOURCE === "BC").length,
+      near: near.map((f) => ({ label: f.FIRE_NUMBER || f.LABEL, dist: f.dist, brg: f.brg, status: f.FIRE_STATUS, source: f.SOURCE })),
+      test: TEST_MODE,
+      lastFetchOk,
+      feedStatus,
+      whz: window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM),
+    }),
     fetchFires,
+    applyLiveExampleFromFeed,
   };
 })();
   </script>
