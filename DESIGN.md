@@ -13,7 +13,7 @@ Add-on for LodgeX **Smart Lodge** and **CrewSight (Major Projects)**. Prototype 
 - Site plan extract in `plan-data.js` (from `site-specific-plan.docx` / `.pptx`): WHZ distance chart, muster (Road 24 laydown), green/yellow/red routes, evacuation roles, **WILDFIRE RESPONSE CHART ICS role duties (verbatim)**, AQ visibility table, resource list, documented gaps.
 - Live knowledge: Alberta Wildfire FeatureServer layer 0 + BCWS `BCWS_ActiveFires_PublicView` FeatureServer/0 (fire number/label, status, size ha, lat/lon).
 - Explicit non-knowledge: blank forestry phone fields, missing ECC/EOC numbers, blank response-team **names/phones** (duty text exists), plot-plan coordinates, alternate meeting points TBD, CO actions table — listed under Plan gaps, never fabricated.
-- Wind context: free Windy embed map centered on the camp pin (no API key).
+- Wind / smoke context: full-page background from **ECCC MSC GeoMet WMS** (HRDPS wind speed + direction) and **NASA GIBS** (MODIS true-colour base + OMPS aerosol index smoke overlay), centred on the camp pin (~160 km extent).
 
 ## 3. Tools
 
@@ -23,11 +23,12 @@ Add-on for LodgeX **Smart Lodge** and **CrewSight (Major Projects)**. Prototype 
 | BCWS ActiveFires PublicView query (GeoJSON) | Read-only fetch of active BC fires (`FIRE_STATUS <> 'Out'`) |
 | Haversine + bearing | Distance/bearing from camp pin to each fire |
 | `computeWhzLevel(nearestKm)` | Map distance → Alert / L1 / L2 / L3 per plan chart |
-| Windy embed2 iframe (`overlay=wind`) | Wind map background behind radar; recenters with camp pin |
+| ECCC MSC GeoMet WMS (`geo.weather.gc.ca/geomet`) | HRDPS-WEonG wind speed + WindDir GetMap images; recenters with camp |
+| NASA GIBS WMS (`gibs.earthdata.nasa.gov`) | MODIS Terra corrected reflectance basemap + OMPS aerosol index smoke overlay |
 | Local UI panels | Display actions, routes, contacts (incl. response chart), AQ, gaps |
 | `?test=1` | Offline sample fires for demos/tests (not live feeds) |
 
-No write tools, no SMS/email send, no other geospatial APIs. No Windy Map Forecast API key (free embed only).
+No write tools, no SMS/email send. Map imagery: ECCC GeoMet + NASA GIBS only (no third-party wind embed). Light map refresh (30 min) to respect ECCC usage policy (no bulk scraping; contact if ≥86,400 req/day).
 
 ## 4. Reasoning and planning
 
@@ -50,7 +51,7 @@ No write tools, no SMS/email send, no other geospatial APIs. No Windy Map Foreca
 - Never invent plan actions, phone numbers, or muster coordinates.
 - Never touch live staging1 (`reservations1.lodgex.ca`), camp-reservations staging branch, or campinspectors.
 - Fire data origins: Alberta mimas FeatureServer/0 + BCWS ActiveFires PublicView only.
-- No secrets, API keys, or auth headers (Windy free embed needs none).
+- No secrets, API keys, or auth headers (ECCC GeoMet + GIBS are public WMS).
 - No user content posted to any server; camp coordinates stay in the browser.
 - Prototype badge; not an automatic evacuation authority.
 - WHZ Level 2 source cell text “25 km 50 km” documented as 25–50 km from chart order — not silently altered beyond that clarification.
@@ -69,8 +70,8 @@ No write tools, no SMS/email send, no other geospatial APIs. No Windy Map Foreca
 ## 8. Communication
 
 - UI: WHZ banner (live), trigger actions list, tabs for routes/muster, contacts (evacuation roles + ICS response chart), air quality, gaps.
-- Radar rings at 25 / 50 / 100 / 150 km aligned to WHZ chart + monitor radius; Windy wind background under semi-transparent overlays.
-- Footer cites Government of Alberta + BC Wildfire Service data sources.
+- Radar rings at 25 / 50 / 100 / 150 km aligned to WHZ chart + monitor radius; ECCC/GIBS map under semi-transparent overlays; wind/smoke toggles + timestamp.
+- Footer cites AB + BC fire feeds; **Data Source: Environment and Climate Change Canada**; NASA GIBS acknowledgment (no NASA endorsement).
 - Human-readable MT timestamps (`America/Edmonton`).
 - Agent-to-agent: status + screenshot paths reported for Ralph’s review; no production blast.
 

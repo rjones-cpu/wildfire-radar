@@ -60,11 +60,12 @@ Authority boundary: UI surfaces plan actions; **evacuation order remains with TC
 
 ---
 
-## 6. Windy wind background (2026-10-31)
+## 6. Background map — ECCC + NASA GIBS (Ralph 2026-10-31)
 
-- Free **Windy embed** (`embed.windy.com/embed2.html`, `overlay=wind`) behind a semi-transparent radar canvas, recentered on the camp pin.
-- Canvas keeps rings, sweep, and fire pings; iframe has `pointer-events: none` so clicks stay on the radar.
-- **No Windy Map Forecast API key** — free embed only. A keyed interactive API is **not** required for this prototype; if deeper integration is wanted later, obtain a key from Windy (do not invent one).
+- Replaced third-party wind iframe with **ECCC MSC GeoMet WMS** + **NASA GIBS WMS** full-page GetMap stack behind the transparent radar.
+- Layers: GIBS `MODIS_Terra_CorrectedReflectance_TrueColor` (base); ECCC `HRDPS-WEonG_2.5km_WindSpeed` + `WindDir`; GIBS `OMPS_Aerosol_Index` (smoke toggle).
+- Attribution / policy: “Data Source: Environment and Climate Change Canada”; GIBS acknowledgment; no NASA endorsement; no bulk GeoMet scraping; map refresh 30 min.
+- Builders in `map-layers.js`; CSP hosts limited to GeoMet + GIBS (plus AB/BC fire connect-src).
 
 ---
 
@@ -81,7 +82,8 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 | Path | Role |
 |------|------|
-| `index.html` | UI, dual feeds, radar + Windy embed |
+| `index.html` | UI, dual feeds, radar + ECCC/GIBS map |
+| `map-layers.js` | WMS GetMap URL builders |
 | `plan-data.js` | Plan extract + `computeWhzLevel` |
 | `DESIGN.md` / `REVIEW.md` / `README.md` | Design, QA notes, runbook |
 | `screenshots/` | Local verification captures |

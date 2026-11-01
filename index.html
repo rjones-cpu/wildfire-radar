@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://geospatial.alberta.ca https://services6.arcgis.com; frame-src https://embed.windy.com; worker-src 'none'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://geo.weather.gc.ca https://gibs.earthdata.nasa.gov; font-src 'self' data:; connect-src 'self' https://geospatial.alberta.ca https://services6.arcgis.com https://geo.weather.gc.ca https://gibs.earthdata.nasa.gov; frame-src 'none'; worker-src 'none'; form-action 'none'" />
   <title>LodgeX Wildfire Preparedness · Radar</title>
   <style>
     :root {
       --bg: #f4f7fb;
-      --panel: rgba(255, 255, 255, 0.88); /* see-through over Windy; text tokens sized for 4.5:1 on #000 composite */
+      --panel: rgba(255, 255, 255, 0.88); /* see-through over map; text tokens sized for 4.5:1 on #000 composite */
       --border: #d0d8e2;
       --green: #15803d; /* graphics / solid buttons / allowlist — unchanged */
       --green-text: #14532d; /* panel text ≥4.5:1 over 0.88 white on #000 */
       --green-dim: rgba(21, 128, 61, 0.22);
       --amber: #b45309; /* graphics */
-      --amber-text: #92400e; /* panel text ≥4.5:1 over dark Windy composite */
+      --amber-text: #92400e; /* panel text ≥4.5:1 over dark map composite */
       --amber-bright: #b45309;
       --red: #b91c1c;
       --text: #142033;
@@ -33,17 +33,64 @@
       position: relative;
       z-index: 1;
     }
-    /* Full-viewport Windy wind map behind all UI (Ralph). */
-    .windy-page-bg {
+    /* Full-viewport ECCC + NASA GIBS map behind all UI (Ralph). */
+    html { background: #0b1220; }
+    .bg-map {
       position: fixed;
       inset: 0;
       width: 100vw;
       height: 100vh;
-      border: 0;
       z-index: -1;
       pointer-events: none;
+      overflow: hidden;
+      background: #0b1220;
     }
-    html { background: transparent; }
+    .bg-map img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .bg-map img#bgBase { opacity: 1; z-index: 0; }
+    .bg-map img#bgWindSpeed { opacity: 0.55; z-index: 1; }
+    .bg-map img#bgWindDir { opacity: 0.85; z-index: 2; }
+    .bg-map img#bgSmoke { opacity: 0.65; z-index: 3; }
+    .bg-map img.is-off { display: none; }
+    .map-controls {
+      position: fixed;
+      left: 12px;
+      bottom: 48px;
+      z-index: 5;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 0.72rem;
+      color: var(--text);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+      max-width: min(320px, calc(100vw - 24px));
+      line-height: 1.45;
+    }
+    .map-controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 10px 4px 0;
+      color: var(--text);
+      font-size: 0.72rem;
+      cursor: pointer;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .map-controls input { margin: 0; }
+    .map-controls .map-time {
+      display: block;
+      color: var(--muted);
+      margin-top: 4px;
+      font-size: 0.68rem;
+    }
     .app-shell {
       position: relative;
       z-index: 1;
@@ -219,7 +266,7 @@
       text-overflow: ellipsis;
       z-index: 3;
     }
-    .windy-credit {
+    .map-credit {
       font-size: 0.68rem;
       color: var(--text);
       text-align: center;
@@ -228,7 +275,7 @@
       border-radius: 8px;
       padding: 4px 10px;
     }
-    .windy-credit a { color: #1a5fb4; }
+    .map-credit a { color: #1a5fb4; }
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -442,16 +489,17 @@
   </style>
 </head>
 <body>
-  <iframe
-    id="windyBg"
-    class="windy-page-bg"
-    title="Windy wind map (full-page background)"
-    loading="lazy"
-    referrerpolicy="no-referrer-when-downgrade"
-    sandbox="allow-scripts"
-    allowfullscreen
-    src="https://embed.windy.com/embed2.html?lat=53.42&lon=-117.50&detailLat=53.42&detailLon=-117.50&zoom=6&level=surface&overlay=wind&product=ecmwf&menu=&message=false&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1"
-  ></iframe>
+  <div id="bgMap" class="bg-map" aria-hidden="true">
+    <img id="bgBase" alt="" decoding="async" />
+    <img id="bgWindSpeed" alt="" decoding="async" />
+    <img id="bgWindDir" alt="" decoding="async" />
+    <img id="bgSmoke" class="is-off" alt="" decoding="async" />
+  </div>
+  <div class="map-controls" role="group" aria-label="Background map layers">
+    <label><input type="checkbox" id="togWind" checked /> Wind (ECCC HRDPS)</label>
+    <label><input type="checkbox" id="togSmoke" /> Smoke (NASA GIBS)</label>
+    <span class="map-time" id="mapTimestamp">Map layers loading…</span>
+  </div>
   <div class="app-shell">
   <div id="testBanner" class="test-banner">TEST DATA MODE — sample fires only (not live AB/BC wildfire feeds)</div>
   
@@ -513,7 +561,7 @@
         <canvas id="radar" width="720" height="720" aria-label="Wildfire radar"></canvas>
         <div class="camp-label" id="campLabel">TEST pin — outside Hinton, AB</div>
       </div>
-      <p class="windy-credit">Full-page wind background: free <a href="https://www.windy.com/" target="_blank" rel="noopener">Windy</a> embed (no API key). Interactive Map Forecast API not used.</p>
+      <p class="map-credit">Background map: ECCC MSC GeoMet WMS wind + NASA GIBS imagery / aerosol index. See footer for licences and attribution.</p>
       <div class="legend">
         <span><i style="background:#15803d"></i>TEST pin (not a real camp)</span>
         <span><i style="background:#b91c1c"></i>Out of Control</span>
@@ -588,14 +636,19 @@
   </main>
 
   <footer>
-    Data © Government of Alberta ·
+    Fires: Data © Government of Alberta ·
     <a href="https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0" target="_blank" rel="noopener">AB Active Wildfire Locations</a>
     · Data © Province of British Columbia / BC Wildfire Service ·
     <a href="https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0" target="_blank" rel="noopener">BCWS ActiveFires PublicView</a>
-    · Prototype / local only · Plan embedded from site-specific doc · Auto-refresh every 5 minutes
+    · Map: <strong>Data Source: Environment and Climate Change Canada</strong>
+    (<a href="https://geo.weather.gc.ca/geomet" target="_blank" rel="noopener">MSC GeoMet</a>; commercial use permitted; no bulk tile scraping; contact if ≥86,400 req/day)
+    · Imagery from NASA’s <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs" target="_blank" rel="noopener">Global Imagery Browse Services (GIBS)</a>, part of NASA’s Earth Science Data and Information System (ESDIS).
+    We acknowledge the use of imagery provided by services from NASA’s GIBS. This product is not endorsed by NASA.
+    · Prototype / local only · Plan embedded from site-specific doc · Fire feeds refresh 5 min · Map layers 30 min
   </footer>
 
   <script src="radar-security.js"></script>
+  <script src="map-layers.js"></script>
   <script src="plan-data.js"></script>
   <script>
 (function () {
@@ -907,7 +960,7 @@
     el.campName.value = name;
     camp = { name, lat: coords.lat, lon: coords.lon };
     el.campLabel.textContent = name;
-    updateWindyEmbed(coords.lat, coords.lon);
+    updateBackgroundMap(coords.lat, coords.lon);
     recomputeNear();
     renderList();
     return true;
@@ -1033,37 +1086,81 @@
     };
   }
 
-  /** Free Windy embed2 iframe — no API key. Recenters wind map on camp pin. */
-  function updateWindyEmbed(lat, lon) {
-    const iframe = document.getElementById("windyBg");
-    if (!iframe || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
-    const q = new URLSearchParams({
-      lat: String(lat),
-      lon: String(lon),
-      detailLat: String(lat),
-      detailLon: String(lon),
-      zoom: "6",
-      level: "surface",
-      overlay: "wind",
-      product: "ecmwf",
-      menu: "",
-      message: "false",
-      marker: "true",
-      calendar: "now",
-      pressure: "",
-      type: "map",
-      location: "coordinates",
-      detail: "",
-      metricWind: "default",
-      metricTemp: "default",
-      radarRange: "-1",
-    });
-    const next = "https://embed.windy.com/embed2.html?" + q.toString();
-    if (iframe.dataset.lastSrc !== next) {
-      iframe.dataset.lastSrc = next;
-      iframe.src = next;
+  /** ECCC + NASA GIBS full-page background (GetMap images; light refresh). */
+  const ML = window.MAP_LAYERS;
+  let ecccTime = null;
+  let mapLoadGen = 0;
+  const elBg = {
+    base: document.getElementById("bgBase"),
+    windSpeed: document.getElementById("bgWindSpeed"),
+    windDir: document.getElementById("bgWindDir"),
+    smoke: document.getElementById("bgSmoke"),
+    togWind: document.getElementById("togWind"),
+    togSmoke: document.getElementById("togSmoke"),
+    stamp: document.getElementById("mapTimestamp"),
+  };
+
+  function mapPixelSize() {
+    const w = ML.clampMapSize(window.innerWidth || 1024);
+    const h = ML.clampMapSize(window.innerHeight || 768);
+    return { w: w, h: h };
+  }
+
+  function applyLayerVisibility() {
+    const windOn = !!(elBg.togWind && elBg.togWind.checked);
+    const smokeOn = !!(elBg.togSmoke && elBg.togSmoke.checked);
+    if (elBg.windSpeed) elBg.windSpeed.classList.toggle("is-off", !windOn);
+    if (elBg.windDir) elBg.windDir.classList.toggle("is-off", !windOn);
+    if (elBg.smoke) elBg.smoke.classList.toggle("is-off", !smokeOn);
+  }
+
+  async function refreshEcccTime() {
+    if (!ML) return null;
+    try {
+      const url = ML.buildEcccCapabilitiesUrl(ML.LAYERS.ecccWindSpeed);
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) return ecccTime;
+      const xml = await res.text();
+      const t0 = ML.parseEcccDefaultTime(xml);
+      if (t0) ecccTime = t0;
+    } catch (e) { /* keep prior */ }
+    return ecccTime;
+  }
+
+  async function updateBackgroundMap(lat, lon) {
+    if (!ML || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const gen = ++mapLoadGen;
+    const sz = mapPixelSize();
+    const bbox = ML.bbox3857Around(lat, lon, ML.DEFAULT_RADIUS_KM);
+    const gibsDay = ML.gibsDateUTC();
+    await refreshEcccTime();
+    if (gen !== mapLoadGen) return;
+    const windTime = ecccTime || undefined;
+    const common = { lat: lat, lon: lon, bbox: bbox, width: sz.w, height: sz.h };
+    const baseUrl = ML.buildGibsBaseUrl(Object.assign({}, common, { time: gibsDay }));
+    const windSpeedUrl = ML.buildEcccWindSpeedUrl(Object.assign({}, common, { time: windTime }));
+    const windDirUrl = ML.buildEcccWindDirUrl(Object.assign({}, common, { time: windTime }));
+    const smokeUrl = ML.buildGibsSmokeUrl(Object.assign({}, common, { time: gibsDay }));
+    if (elBg.base) elBg.base.src = baseUrl;
+    if (elBg.windSpeed) elBg.windSpeed.src = windSpeedUrl;
+    if (elBg.windDir) elBg.windDir.src = windDirUrl;
+    if (elBg.smoke) elBg.smoke.src = smokeUrl;
+    applyLayerVisibility();
+    if (elBg.stamp) {
+      const windLabel = windTime ? windTime.replace("T", " ").replace(/:00Z$/, "Z") : "—";
+      elBg.stamp.textContent =
+        "Base/smoke (GIBS): " + gibsDay + " UTC · Wind (ECCC HRDPS): " + windLabel +
+        " · ~" + ML.DEFAULT_RADIUS_KM + " km extent";
     }
   }
+
+  if (elBg.togWind) elBg.togWind.addEventListener("change", applyLayerVisibility);
+  if (elBg.togSmoke) elBg.togSmoke.addEventListener("change", applyLayerVisibility);
+  let mapResizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(mapResizeTimer);
+    mapResizeTimer = setTimeout(() => updateBackgroundMap(camp.lat, camp.lon), 400);
+  });
 
   function recomputeNear() {
     near = fires
@@ -1255,7 +1352,7 @@
     const maxR = Math.min(cx, cy) - 18;
 
     ctx.clearRect(0, 0, w, h);
-    // No disc fill — radar canvas is fully transparent over Windy.
+    // No disc fill — radar canvas is fully transparent over the background map.
 
     function strokeHaloCircle(x, y, r, color, width) {
       ctx.beginPath();
@@ -1284,7 +1381,7 @@
       ctx.stroke();
     }
 
-    // range rings (white halo + dark green) for ≥3:1 over light and dark Windy tones
+    // range rings (white halo + dark green) for ≥3:1 over light and dark map tones
     RINGS.forEach((km) => {
       const r = (km / RADIUS_KM) * maxR;
       strokeHaloCircle(cx, cy, r, "#14532d", 2);
@@ -1312,7 +1409,7 @@
     });
     ctx.textAlign = "start";
 
-    // sweep wedge (low-opacity so Windy stays visible) + haloed leading edge
+    // sweep wedge (low-opacity so map stays visible) + haloed leading edge
     const sweepWidth = Math.PI / 5;
     ctx.save();
     ctx.beginPath();
@@ -1464,6 +1561,7 @@
   applyCampFromInputs();
   fetchFires();
   setInterval(fetchFires, REFRESH_MS);
+  if (ML) setInterval(() => updateBackgroundMap(camp.lat, camp.lon), ML.MAP_REFRESH_MS);
   requestAnimationFrame(drawRadar);
 
   // Expose for headless tests
@@ -1478,9 +1576,17 @@
       lastFetchOk,
       feedStatus,
       whz: window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM),
+      map: {
+        ecccTime,
+        gibsDate: ML ? ML.gibsDateUTC() : null,
+        wind: !!(elBg.togWind && elBg.togWind.checked),
+        smoke: !!(elBg.togSmoke && elBg.togSmoke.checked),
+        layers: ML ? ML.LAYERS : null,
+      },
     }),
     fetchFires,
     applyLiveExampleFromFeed,
+    updateBackgroundMap,
   };
 })();
   </script>

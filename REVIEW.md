@@ -8,15 +8,16 @@
 
 | Path | Change |
 |------|--------|
-| `index.html` | Dual AB+BC feeds; WHZ UI; plan tabs; Windy embed (`sandbox=allow-scripts`); CSP meta; Contacts ICS response chart |
-| `radar-security.js` | `escapeHtml` (incl. `'`) + route colour hex allowlist |
-| `test/whz-escape.test.js` | Plain Node tests for WHZ edges + escape/allowlist |
+| `index.html` | Dual AB+BC feeds; WHZ UI; plan tabs; ECCC+GIBS full-page map (no iframe); CSP meta; Contacts ICS response chart |
+| `map-layers.js` | WMS GetMap URL builders (ECCC HRDPS wind, GIBS base/smoke), bbox, time helpers |
+| `radar-security.js` | `escapeHtml` (incl. `'`) + route colour hex allowlist + status text colours |
+| `test/whz-escape.test.js` | Plain Node tests for WHZ edges + escape/allowlist + map URL builders |
 | `plan-data.js` | Plan knowledge + `computeWhzLevel` + **responseChartRoles** (verbatim docx) + reworded gaps |
-| `DESIGN.md` | Nine agent functions (dual feed + Windy) |
+| `DESIGN.md` | Nine agent functions (dual feed + ECCC/GIBS map) |
 | `REVIEW.md` | This summary |
 | `HANDOFF.md` | Merged briefs; Ralph dual-feed decision |
 | `README.md` | Preparedness module + BC feed + run notes |
-| `screenshots/` | Local verification captures (incl. baseline, Windy before/after, 13+) |
+| `screenshots/` | Local verification captures |
 
 ## Dual feed (Ralph decision — 2026-10-31)
 
@@ -26,12 +27,13 @@
 - Each fire tagged `SOURCE: AB|BC`; nearest of either province within 150 km drives WHZ.
 - `Promise.allSettled`: one feed failing does not clear the other.
 
-## Windy wind background
+## Background map (ECCC + NASA GIBS) — Ralph 2026-10-31
 
-- Free `embed.windy.com/embed2.html` with `overlay=wind`, centered on camp pin; canvas rings/fires remain on top (`pointer-events: none` on iframe).
-- iframe `sandbox="allow-scripts"` only (**no** `allow-same-origin`).
-- **No Windy Map Forecast API key** required or used.
-- **Third-party console noise:** Windy’s embed may log CORS / cross-origin warnings in the browser console for its own tile or analytics subrequests. That is third-party noise, not an app connect-src violation for our AB/BC feeds; do not treat it as a LodgeX feed failure.
+- Replaced prior third-party wind iframe with **commercially licensed** public WMS:
+  - **ECCC MSC GeoMet** `https://geo.weather.gc.ca/geomet` — layers `HRDPS-WEonG_2.5km_WindSpeed` (style `WINDSPEEDKMH`) + `HRDPS-WEonG_2.5km_WindDir` (style `WDIR6`). Attribution: **Data Source: Environment and Climate Change Canada**. Usage: no bulk tile scraping; contact if ≥86,400 req/day. App refresh **30 min**, single GetMap per layer (not tile scraping).
+  - **NASA GIBS** `https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi` — base `MODIS_Terra_CorrectedReflectance_TrueColor`; smoke toggle `OMPS_Aerosol_Index`. Required GIBS acknowledgment in footer; **no NASA endorsement** implied.
+- Full-page stacked `<img>` GetMap layers centred on camp (~160 km extent ≈ radar 150 km); layer toggles + timestamp; radar canvas stays transparent on top.
+- **CSP:** `frame-src 'none'`; `img-src` / `connect-src` include exactly `geo.weather.gc.ca` and `gibs.earthdata.nasa.gov` (plus existing AB/BC fire hosts on connect-src).
 
 ## Plan / gaps (current)
 
@@ -43,11 +45,11 @@
 
 1. **No secrets** — no API keys, tokens, credentials, or `.env` files.
 2. **Read-only public feeds** — browser GET to AB FeatureServer + BCWS ActiveFires PublicView only. No writes.
-3. **No user input sent anywhere** — camp lat/lon used only in-browser for haversine / Windy recenter.
+3. **No user input sent anywhere** — camp lat/lon used only in-browser for haversine / map recenter.
 4. **No PII collection** — plan contacts are role titles/duties from the site document; blanks shown as gaps.
 5. **No production hosting / no push** until SOC 2 + Smart Lodge QA pass the same SHA.
 6. **XSS hygiene** — plan and feed strings rendered via `escapeHtml` (escapes `& < > " '`); route swatch colours go through a hex **allowlist** (`safeRouteColor`).
-7. **CSP** — meta CSP with `connect-src` limited to AB + BC FeatureServer hosts and `frame-src https://embed.windy.com`.
+7. **CSP** — meta CSP: `connect-src` = AB + BC FeatureServers + ECCC GeoMet + GIBS; `img-src` = self/data + GeoMet + GIBS; `frame-src 'none'`.
 8. **Prototype authority boundary** — UI does not auto-evacuate.
 
 ## QA notes (for Smart Lodge QA)

@@ -22,6 +22,22 @@ python3 -m http.server 8765
 
 Each ping is tagged **AB** or **BC**. Feeds load in parallel; one failure keeps the other. Same 150 km range and WHZ plan triggers apply to the nearest fire of either province.
 
+## Background map (wind / smoke)
+
+Full-page map behind the transparent radar (no third-party wind embed):
+
+| Layer | Source | Id |
+|-------|--------|----|
+| Basemap | NASA GIBS WMS | `MODIS_Terra_CorrectedReflectance_TrueColor` |
+| Wind speed | ECCC MSC GeoMet WMS | `HRDPS-WEonG_2.5km_WindSpeed` / `WINDSPEEDKMH` |
+| Wind direction | ECCC MSC GeoMet WMS | `HRDPS-WEonG_2.5km_WindDir` / `WDIR6` |
+| Smoke (toggle) | NASA GIBS WMS | `OMPS_Aerosol_Index` |
+
+- Endpoints: `https://geo.weather.gc.ca/geomet` · `https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi`
+- **ECCC:** commercial use allowed; attribute **Data Source: Environment and Climate Change Canada**; no bulk tile scraping; contact if ≥86,400 requests/day. This app uses infrequent GetMap images (≈30 min refresh).
+- **GIBS:** acknowledge NASA GIBS / ESDIS; no NASA endorsement implied.
+- URL builders live in `map-layers.js`.
+
 ## Plan
 
 Extracted into `plan-data.js` from `/workspace/wildfire-preparedness/site-specific-plan.docx` (+ pptx context).
