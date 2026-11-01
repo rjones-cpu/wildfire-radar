@@ -1,0 +1,2230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://maps.googleapis.com https://maps.gstatic.com; img-src 'self' data: blob: https://geo.weather.gc.ca https://gibs.earthdata.nasa.gov https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com https://*.ggpht.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://geospatial.alberta.ca https://services6.arcgis.com https://geo.weather.gc.ca https://api.weather.gc.ca https://gibs.earthdata.nasa.gov https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com; frame-src https://*.google.com; worker-src blob:; form-action 'none'" />
+  <title>LodgeX Wildfire Preparedness · Radar</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: rgba(255, 255, 255, 0.88); /* see-through over map; text tokens sized for 4.5:1 on #000 composite */
+      --border: #d0d8e2;
+      --green: #15803d; /* graphics / solid buttons / allowlist — unchanged */
+      --green-text: #14532d; /* panel text ≥4.5:1 over 0.88 white on #000 */
+      --green-dim: rgba(21, 128, 61, 0.22);
+      --amber: #b45309; /* graphics */
+      --amber-text: #92400e; /* panel text ≥4.5:1 over dark map composite */
+      --amber-bright: #b45309;
+      --red: #b91c1c;
+      --text: #142033;
+      --muted: #475569; /* darkened for 4.5:1 over 0.88 white on #000 */
+      --ring: rgba(21, 128, 61, 0.85);
+      --surface: #f0f4f8;
+      --input-bg: #ffffff; /* solid — WCAG text fields */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: transparent;
+      color: var(--text);
+      min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+    /* Full-viewport Google Maps (hybrid) + ECCC RDPS wind particles behind UI (Ralph). */
+    html { background: #0b1220; }
+    .bg-map {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+      pointer-events: none;
+      overflow: hidden;
+      background: #0b1220;
+    }
+    .bg-map #bgGoogleMap {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+    .bg-map img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    /* Above Maps imagery panes (sibling stack); OverlayView may reparent into map panes. */
+    .bg-map canvas#bgWindCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1000;
+      pointer-events: none;
+      opacity: 1;
+    }
+    .bg-map canvas#bgWindCanvas.is-off { display: none; }
+    .bg-map img#bgSmoke { opacity: 0.55; z-index: 1001; }
+    .bg-map img.is-off { display: none; }
+    /* Local/referrer fallback: dark satellite-like base so particles can be contrast-checked. */
+    .bg-map.map-mock-sat {
+      background:
+        radial-gradient(ellipse at 28% 35%, #1f4a32 0%, transparent 42%),
+        radial-gradient(ellipse at 72% 62%, #1a3048 0%, transparent 48%),
+        radial-gradient(ellipse at 50% 80%, #2a2218 0%, transparent 40%),
+        linear-gradient(165deg, #07140f 0%, #0c1824 40%, #050a12 100%);
+    }
+    /* Hide Maps error tile pane — it paints a light grey that kills contrast. */
+    .bg-map.map-mock-sat #bgGoogleMap {
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .bg-map.map-mock-sat .map-fallback.show {
+      background: transparent;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 10px 14px 0 0;
+    }
+    .bg-map.map-mock-sat .map-fallback.show > div {
+      max-width: 320px;
+      padding: 10px 12px;
+      font-size: 11px;
+      line-height: 1.35;
+      background: rgba(8, 14, 22, 0.72);
+      color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .bg-map.map-mock-sat .map-fallback.show strong { color: #f8fafc; }
+    .map-controls .wind-forecast {
+      display: block;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    .map-controls .wind-forecast label {
+      display: block;
+      margin: 0 0 4px;
+      cursor: default;
+    }
+    .map-controls .wind-forecast label strong {
+      font-weight: 650;
+      white-space: normal;
+      line-height: 1.35;
+    }
+    .map-controls input[type="range"] {
+      width: 100%;
+      max-width: 280px;
+      margin: 0;
+      accent-color: #1d4ed8;
+    }
+    .map-controls .wind-status {
+      display: block;
+      color: var(--muted);
+      font-size: 0.68rem;
+      margin-top: 2px;
+    }
+    .map-controls .wind-status.err { color: #9a3412; }
+    .map-fallback {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: #0b1220;
+      color: #e2e8f0;
+      text-align: center;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .map-fallback.show { display: flex; }
+    .map-fallback strong { color: #f8fafc; }
+    .map-controls {
+      position: fixed;
+      left: 12px;
+      bottom: 48px;
+      z-index: 5;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 0.72rem;
+      color: var(--text);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+      max-width: min(320px, calc(100vw - 24px));
+      line-height: 1.45;
+    }
+    .map-controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 10px 4px 0;
+      color: var(--text);
+      font-size: 0.72rem;
+      cursor: pointer;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .map-controls input { margin: 0; }
+    .map-controls .map-time {
+      display: block;
+      color: var(--muted);
+      margin-top: 4px;
+      font-size: 0.68rem;
+    }
+    .app-shell {
+      position: relative;
+      z-index: 1;
+    }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(2px);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+    }
+    header h1 span { color: var(--green-text); }
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #fff4d6;
+      color: #8a5a00;
+      border: 1px solid #e0b84a;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    .badge.test {
+      background: #ffe0e0;
+      color: #a32020;
+      border-color: #e08080;
+    }
+    .meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: right;
+    }
+    .meta strong { color: var(--text); }
+    main {
+      display: grid;
+      grid-template-columns: minmax(280px, 380px) 1fr;
+      gap: 16px;
+      padding: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      backdrop-filter: blur(2px);
+    }
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #eef2f7;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+    }
+    button.primary {
+      background: #15803d;
+      border-color: #166534;
+      color: #ffffff;
+      font-weight: 650;
+    }
+    button:hover { filter: brightness(1.1); }
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin: 8px 0 0;
+      line-height: 1.4;
+    }
+    .status-line {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .status-line.err { color: var(--red); font-weight: 650; }
+    .status-line.ok { color: var(--green-text); font-weight: 650; }
+    .radar-wrap.panel {
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }
+    .radar-wrap {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .radar-frame {
+      position: relative;
+      width: min(100%, 640px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: transparent;
+      border: 2px solid #15803d;
+      box-shadow: 0 0 0 1px rgba(21, 128, 61, 0.35);
+      overflow: hidden;
+    }
+    canvas#radar {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+      z-index: 2;
+      background: transparent;
+    }
+    .camp-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, 14px);
+      font-size: 0.7rem;
+      color: #0d3d22;
+      background: rgba(255,255,255,0.88);
+      border: 1px solid #1a9e4a;
+      padding: 2px 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      white-space: nowrap;
+      max-width: 90%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      z-index: 3;
+    }
+    .map-credit {
+      font-size: 0.68rem;
+      color: var(--text);
+      text-align: center;
+      margin: 0;
+      background: rgba(255, 255, 255, 0.88);
+      border-radius: 8px;
+      padding: 4px 10px;
+    }
+    .map-credit a { color: #1a5fb4; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 18px;
+      font-size: 0.75rem;
+      color: var(--text);
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+    }
+    .legend i {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .fire-list {
+      max-height: 420px;
+      overflow: auto;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .fire-list li {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      background: var(--surface);
+    }
+    .fire-list li:hover { border-color: #1a9e4a; }
+    .fire-list .name {
+      font-weight: 650;
+      color: var(--green-text);
+      margin-bottom: 4px;
+    }
+    .fire-list .detail {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .empty {
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 12px;
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+    }
+    .test-banner {
+      display: none;
+      background: rgba(255, 232, 232, 0.92);
+      color: #8b1515;
+      text-align: center;
+      padding: 8px;
+      font-size: 0.85rem;
+      font-weight: 650;
+      border-bottom: 1px solid #e0a0a0;
+    }
+    .test-banner.show { display: block; }
+    footer {
+      text-align: left;
+      font-size: 0.72rem;
+      color: #142033; /* ≥4.5:1 on 0.94 white/#000 */
+      padding: 14px 18px 28px;
+      background: rgba(255, 255, 255, 0.94);
+      line-height: 1.55;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    footer a { color: #0b4f8a; } /* ≥4.5:1 on footer composite */
+    footer .licence-block {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      color: #142033;
+    }
+    footer .licence-block p { margin: 0 0 6px; }
+
+    .whz-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(2px);
+      font-size: 0.9rem;
+    }
+    .whz-banner .level {
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+    .whz-banner .level.none { background:#eef2f7; color: #4b5563; border-color:#c5ced8; }
+    .whz-banner .level.alert { background:#dcfce7; color: #166534; border-color:#15803d; }
+    .whz-banner .level.level1 { background:#fff4d6; color: var(--amber-text); border-color:#e0b84a; }
+    .whz-banner .level.level2 { background:#ffedd5; color: #9a3412; border-color:#f0a060; }
+    .whz-banner .level.level3 { background:#ffe0e0; color: #a32020; border-color:#e07070; }
+    .whz-banner .reason { color: var(--muted); flex: 1; min-width: 200px; }
+    .whz-banner .reason strong { color: var(--text); }
+
+
+    .src-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-right: 6px;
+      vertical-align: middle;
+      letter-spacing: 0.04em;
+    }
+    .src-badge.ab { background: #e6f7ec; color: #0f7a38; border: 1px solid #1a9e4a; }
+    .src-badge.bc { background: #e8f0ff; color: #1a5fb4; border: 1px solid #5a8fd4; }
+  </style>
+</head>
+<body>
+  <div id="bgMap" class="bg-map" aria-hidden="true">
+    <div id="bgGoogleMap" role="presentation"></div>
+    <div id="mapFallback" class="map-fallback" role="status">
+      <div>
+        <strong>Google Maps could not load</strong><br/>
+        The background map needs a valid Maps JavaScript API key with this page’s referrer allowed
+        (production: <code>https://rjones-cpu.github.io/*</code>). Localhost often shows a billing or referrer error.
+        Wind particles / smoke overlays and the radar still work without the map tiles.
+      </div>
+    </div>
+    <canvas id="bgWindCanvas" aria-hidden="true"></canvas>
+    <img id="bgSmoke" class="is-off" alt="" decoding="async" />
+  </div>
+  <div class="map-controls" role="group" aria-label="Background map layers">
+    <label><input type="checkbox" id="togWind" checked /> Wind particles (ECCC HRDPS/RDPS forecast)</label>
+    <label><input type="checkbox" id="togStations" checked /> Station winds (ECCC SWOB)</label>
+    <label><input type="checkbox" id="togSmoke" /> Smoke (NASA GIBS)</label>
+    <div class="wind-forecast">
+      <label for="windForecast">Forecast hour: <strong id="windForecastLabel">now</strong></label>
+      <input type="range" id="windForecast" min="0" max="48" step="1" value="0" aria-valuemin="0" aria-valuemax="48" aria-valuenow="0" />
+      <span class="wind-status" id="windStatus">Loading ECCC RDPS wind grid…</span>
+    </div>
+    <span class="map-time" id="mapTimestamp">Map layers loading…</span>
+  </div>
+  <div class="app-shell">
+  <div id="testBanner" class="test-banner">TEST DATA MODE — sample fires only (not live AB/BC wildfire feeds)</div>
+  
+  <div id="whzBanner" class="whz-banner" role="status" aria-live="polite">
+    <span class="level none" id="whzLevelBadge">WHZ —</span>
+    <span class="reason" id="whzReason">Computing WHZ…</span>
+  </div>
+
+  <header>
+    <h1>LodgeX <span>Wildfire Preparedness</span> <span class="badge" id="modeBadge">PROTOTYPE</span></h1>
+    <div class="meta">
+      <div>Sources: AB Wildfire + BCWS ActiveFires (public)</div>
+      <div>Last updated: <strong id="lastUpdated">—</strong></div>
+      <div>Active AB: <strong id="abCount">—</strong> · BC: <strong id="bcCount">—</strong> · Within 150 km: <strong id="nearCount">—</strong></div>
+    </div>
+  </header>
+
+  <main>
+    <aside>
+      <div class="panel">
+        <h2>Fires within 150 km</h2>
+        <div class="btn-row">
+          <button id="btnRefresh" type="button">Refresh now</button>
+        </div>
+        <div id="fetchStatus" class="status-line">Loading…</div>
+        <p class="hint">
+          Camp pin defaults to a <strong>TEST location</strong> just outside Hinton, AB (53.42, −117.50) — not a real LodgeX camp.
+          Set <code>?lat=&amp;lon=&amp;name=</code> (validated) or <code>?example=1</code>, or click the radar to move the pin.
+        </p>
+        <ul class="fire-list" id="fireList"></ul>
+        <div class="empty" id="emptyMsg" style="display:none">No active wildfires within 150 km</div>
+      </div>
+    </aside>
+
+    <section class="radar-wrap panel">
+      <h2 style="align-self:flex-start">Radar · 150 km sweep</h2>
+      <div class="radar-frame">
+        <canvas id="radar" width="720" height="720" aria-label="Wildfire radar"></canvas>
+        <div class="camp-label" id="campLabel">TEST pin — outside Hinton, AB</div>
+      </div>
+      <p class="map-credit">Background: Google Maps hybrid + ECCC HRDPS/RDPS wind particles + SWOB station winds (smoke optional). Google logo/attribution appears on the map. See footer for licences.</p>
+      <div class="legend">
+        <span><i style="background:#15803d"></i>TEST pin (not a real camp)</span>
+        <span><i style="background:#b91c1c"></i>Out of Control</span>
+        <span><i style="background:#b45309"></i>Being Held</span>
+        <span><i style="background:#1d4ed8"></i>Under Control / other</span>
+        <span><span class="src-badge ab">AB</span> Alberta · <span class="src-badge bc">BC</span> British Columbia</span>
+        <span>Rings: 25 · 50 · 100 · 150 km (WHZ)</span>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p style="margin:0 0 6px">
+      Fires: Data © Government of Alberta ·
+      <a href="https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0" target="_blank" rel="noopener">AB Active Wildfire Locations</a>
+      · Data © Province of British Columbia / BC Wildfire Service ·
+      <a href="https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0" target="_blank" rel="noopener">BCWS ActiveFires PublicView</a>
+      · Background map: <strong>Google Maps</strong> (Maps JavaScript API; Google’s own logo and attribution appear on the map).
+      · Wind particles &amp; stations: <strong>Data Source: Environment and Climate Change Canada</strong>
+      (<a href="https://geo.weather.gc.ca/geomet" target="_blank" rel="noopener">MSC GeoMet</a> HRDPS-WEonG 2.5&nbsp;km primary / RDPS 10&nbsp;km fallback; SWOB realtime observations via
+      <a href="https://api.weather.gc.ca/collections/swob-realtime" target="_blank" rel="noopener">GeoMet OGC API</a>;
+      commercial use permitted under the ECCC Data Services End-use Licence; no bulk scraping; contact if ≥86,400 req/day).
+      Model run, valid time, and station obs time shown in the map controls. See <code>WIND-SOURCES.md</code>.
+      · Optional smoke overlay: imagery from NASA’s <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs" target="_blank" rel="noopener">Global Imagery Browse Services (GIBS)</a> / ESDIS. We acknowledge NASA GIBS. This product is not endorsed by NASA.
+      · Prototype · WHZ thresholds from site plan extract (<code>plan-data.js</code>) · Fire feeds refresh 5 min · Map overlays 30 min
+    </p>
+    <div class="licence-block">
+      <p>Contains information licensed under the <a href="https://www2.gov.bc.ca/gov/content/data/policy-standards/data-policies/open-data/open-government-licence-bc" target="_blank" rel="noopener">Open Government Licence – British Columbia</a>.</p>
+      <p>Contains information licensed under the <a href="https://open.alberta.ca/licence" target="_blank" rel="noopener">Open Government Licence – Alberta</a>.</p>
+      <p>This page is <strong>not</strong> an official BC Wildfire Service or Alberta Wildfire product and is <strong>not</strong> endorsed by either government.</p>
+      <p>Fire data is for reference only, is not guaranteed accurate, and locations are approximate. It is not for insurance or risk decisions.
+        See the <a href="https://www2.gov.bc.ca/gov/content/safety/wildfire-status/about-bcws/disclaimer" target="_blank" rel="noopener">BC Wildfire Service disclaimer</a>.</p>
+    </div>
+  </footer>
+
+  <script src="radar-security.js"></script>
+  <script src="map-layers.js"></script>
+  <script src="wind-grid.js"></script>
+  <script src="wind-stations.js"></script>
+  <script src="wind-particles.js"></script>
+  <script src="maps-config.js"></script>
+  <script src="plan-data.js"></script>
+  <script>
+(function () {
+  const API_AB =
+    "https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0/query" +
+    "?where=1%3D1&outFields=*&returnGeometry=true&f=geojson";
+  const API_BC =
+    "https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0/query" +
+    "?where=" + encodeURIComponent("FIRE_STATUS <> 'Out'") +
+    "&outFields=FIRE_NUMBER,FIRE_STATUS,CURRENT_SIZE,LATITUDE,LONGITUDE,INCIDENT_NAME" +
+    "&returnGeometry=true&outSR=4326&f=geojson&resultRecordCount=2000";
+  const RADIUS_KM = 150;
+  const RINGS = [25, 50, 100, 150];
+  const REFRESH_MS = 5 * 60 * 1000;
+  const DEFAULT = { name: "TEST pin — just outside Hinton, AB (not a real camp)", lat: 53.42, lon: -117.50 };
+
+  const params = new URLSearchParams(location.search);
+  const TEST_MODE = params.get("test") === "1";
+  const EXAMPLE_MODE = params.get("example") === "1";
+  let exampleAutoPending = EXAMPLE_MODE && !TEST_MODE;
+
+  const canvas = document.getElementById("radar");
+  const ctx = canvas.getContext("2d");
+  const el = {
+    campLabel: document.getElementById("campLabel"),
+    fireList: document.getElementById("fireList"),
+    emptyMsg: document.getElementById("emptyMsg"),
+    lastUpdated: document.getElementById("lastUpdated"),
+    abCount: document.getElementById("abCount"),
+    bcCount: document.getElementById("bcCount"),
+    nearCount: document.getElementById("nearCount"),
+    fetchStatus: document.getElementById("fetchStatus"),
+    testBanner: document.getElementById("testBanner"),
+    modeBadge: document.getElementById("modeBadge"),
+    whzLevelBadge: document.getElementById("whzLevelBadge"),
+    whzReason: document.getElementById("whzReason"),
+  };
+
+  let camp = { ...DEFAULT };
+  let fires = [];       // all active from feed
+  let near = [];        // within 150 km with distance/bearing
+  let sweep = 0;        // radians
+  let hoverIdx = -1;
+  let lastFetchOk = false;
+  let feedStatus = { ab: null, bc: null }; // "ok" | "error" | null
+
+  // --- Test sample fires (relative to default Hinton TEST pin for WHZ demos) ---
+  const TEST_FIRES = [
+    {
+      LABEL: "TEST-OC-01",
+      FIRE_NUMBER: "TEST-OC-01",
+      FIRE_STATUS: "Out of Control",
+      AREA_ESTIMATE: 420.5,
+      LATITUDE: 53.656,
+      LONGITUDE: -117.368,
+      SOURCE: "AB",
+    },
+    {
+      LABEL: "TEST-BH-02",
+      FIRE_NUMBER: "TEST-BH-02",
+      FIRE_STATUS: "Being Held",
+      AREA_ESTIMATE: 85,
+      LATITUDE: 53.256,
+      LONGITUDE: -117.068,
+      SOURCE: "AB",
+    },
+    {
+      LABEL: "TEST-UC-03",
+      FIRE_NUMBER: "TEST-UC-03",
+      FIRE_STATUS: "Under Control",
+      AREA_ESTIMATE: 12.3,
+      LATITUDE: 53.506,
+      LONGITUDE: -117.868,
+      SOURCE: "AB",
+    },
+    {
+      LABEL: "TEST-BC-05",
+      FIRE_NUMBER: "TEST-BC-05",
+      FIRE_STATUS: "Being Held",
+      AREA_ESTIMATE: 210,
+      LATITUDE: 53.156,
+      LONGITUDE: -118.718,
+      SOURCE: "BC",
+    },
+    {
+      LABEL: "TEST-FAR-04",
+      FIRE_NUMBER: "TEST-FAR-04",
+      FIRE_STATUS: "Out of Control",
+      AREA_ESTIMATE: 900,
+      LATITUDE: 54.956,
+      LONGITUDE: -119.318,
+      SOURCE: "AB",
+    },
+  ];
+
+  if (TEST_MODE) {
+    el.testBanner.classList.add("show");
+    el.modeBadge.classList.add("test");
+    el.modeBadge.textContent = "TEST DATA";
+  }
+
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  /** Bearing degrees clockwise from north */
+  function bearingDeg(lat1, lon1, lat2, lon2) {
+    const toRad = (d) => (d * Math.PI) / 180;
+    const toDeg = (r) => (r * 180) / Math.PI;
+    const φ1 = toRad(lat1), φ2 = toRad(lat2);
+    const Δλ = toRad(lon2 - lon1);
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  /** Destination lat/lon given distance km and bearing deg from north */
+  function destination(lat, lon, distKm, bearing) {
+    const R = 6371;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const toDeg = (r) => (r * 180) / Math.PI;
+    const δ = distKm / R;
+    const θ = toRad(bearing);
+    const φ1 = toRad(lat);
+    const λ1 = toRad(lon);
+    const φ2 = Math.asin(
+      Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(θ)
+    );
+    const λ2 =
+      λ1 +
+      Math.atan2(
+        Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
+        Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2)
+      );
+    return { lat: toDeg(φ2), lon: ((toDeg(λ2) + 540) % 360) - 180 };
+  }
+
+  const statusColor = window.statusColor;
+  const statusTextColor = window.statusTextColor;
+  if (typeof statusColor !== "function" || typeof statusTextColor !== "function") {
+    console.error("radar-security.js statusColor/statusTextColor missing");
+  }
+
+  const PLAN = window.WILDFIRE_PLAN;
+  if (!PLAN) {
+    console.error("plan-data.js missing");
+  }
+
+  const escapeHtml = window.escapeHtml;
+  if (typeof escapeHtml !== "function") {
+    console.error("radar-security.js missing");
+  }
+  // Fire-list status uses statusTextColor (panel text); radar markers use statusColor (graphics).
+
+  function updateWhzUi() {
+    if (!PLAN || !window.computeWhzLevel) return;
+    const nearest = near.length ? near[0].dist : null;
+    const result = window.computeWhzLevel(nearest, RADIUS_KM);
+    const badge = el.whzLevelBadge;
+    badge.className = "level none";
+    if (!result.level) {
+      badge.textContent = "WHZ — CLEAR / OUTSIDE TRIGGERS";
+      el.whzReason.innerHTML = escapeHtml(result.reason);
+    } else {
+      const id = result.level.id;
+      badge.className = "level " + (id === "alert" ? "alert" : id);
+      badge.textContent = result.level.name + " · " + result.level.rangeLabel;
+      const fireLabel = near[0] ? (near[0].LABEL || near[0].FIRE_NUMBER || "Unknown") : "—";
+      el.whzReason.innerHTML =
+        escapeHtml(result.reason) +
+        " · Driving fire: <strong>" + escapeHtml(fireLabel) + "</strong>";
+    }
+  }
+
+  function setCamp(name, lat, lon) {
+    const coords = window.validateCampCoords(lat, lon);
+    if (!coords.ok) {
+      el.fetchStatus.textContent = coords.error || "Invalid lat/lon";
+      el.fetchStatus.className = "status-line err";
+      return false;
+    }
+    const safeName = window.sanitizeCampName(name, DEFAULT.name);
+    camp = { name: safeName, lat: coords.lat, lon: coords.lon };
+    el.campLabel.textContent = safeName;
+    updateBackgroundMap(coords.lat, coords.lon);
+    recomputeNear();
+    renderList();
+    return true;
+  }
+
+  /**
+   * Pin an EXAMPLE camp ~35 km from a live active fire (prefers BC OOC/Held).
+   * Uses current in-memory feed; call after fetch. Returns {ok, fire, distKm, whz} or {ok:false,error}.
+   */
+  function applyLiveExampleFromFeed(fireList) {
+    const list = (fireList || fires).filter(
+      (f) => Number.isFinite(f.LATITUDE) && Number.isFinite(f.LONGITUDE)
+    );
+    if (!list.length) {
+      el.fetchStatus.textContent = "Live example unavailable — no active fires in feed right now.";
+      el.fetchStatus.className = "status-line err";
+      return { ok: false, error: "no fires" };
+    }
+
+    function nearestFrom(lat, lon) {
+      let best = null;
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i];
+        const d = haversineKm(lat, lon, f.LATITUDE, f.LONGITUDE);
+        if (!best || d < best.dist) best = { fire: f, dist: d };
+      }
+      return best;
+    }
+
+    // Prefer BC OOC/Held as the *anchor*, then search bearings so nearest ends ~30–40 km (L2), else L1.
+    const ranked = list.slice().sort((a, b) => {
+      const score = (f) => {
+        const s = String(f.FIRE_STATUS || "").toLowerCase();
+        let n = f.SOURCE === "BC" ? 10 : f.SOURCE === "AB" ? 5 : 0;
+        if (s.includes("out of control")) n += 30;
+        else if (s.includes("being held")) n += 20;
+        else if (s.includes("under control")) n += 5;
+        return n;
+      };
+      return score(b) - score(a);
+    });
+
+    const bearings = [0, 45, 90, 135, 180, 225, 270, 315];
+    const distsTry = [35, 38, 32, 40, 30];
+    let bestPin = null;
+    let bestMeta = null;
+    let bestScore = -1e9;
+
+    function pinScore(nearestDist, anchorIsNearest) {
+      // Prefer 30–40 km (Level 2), then 50–100 (Level 1); avoid ≤25 (L3) when possible.
+      let s = 0;
+      if (nearestDist >= 30 && nearestDist <= 40) s += 100;
+      else if (nearestDist > 25 && nearestDist <= 50) s += 70;
+      else if (nearestDist > 50 && nearestDist <= 100) s += 40;
+      else if (nearestDist > 100 && nearestDist <= 150) s += 10;
+      else if (nearestDist <= 25) s -= 50;
+      if (anchorIsNearest) s += 25;
+      return s;
+    }
+
+    outer: for (const anchor of ranked.slice(0, 12)) {
+      for (const dKm of distsTry) {
+        for (const brg of bearings) {
+          const pin = destination(anchor.LATITUDE, anchor.LONGITUDE, dKm, brg);
+          const n = nearestFrom(pin.lat, pin.lon);
+          if (!n) continue;
+          const anchorIsNearest =
+            (n.fire.FIRE_NUMBER && n.fire.FIRE_NUMBER === anchor.FIRE_NUMBER) ||
+            (n.fire.LATITUDE === anchor.LATITUDE && n.fire.LONGITUDE === anchor.LONGITUDE);
+          const sc = pinScore(n.dist, anchorIsNearest);
+          if (sc > bestScore) {
+            bestScore = sc;
+            bestPin = pin;
+            bestMeta = { anchor, nearest: n };
+          }
+          if (sc >= 120) break outer; // great L2 hit with anchor as nearest
+        }
+      }
+    }
+
+    if (!bestPin || !bestMeta) {
+      el.fetchStatus.textContent = "Live example unavailable — could not place EXAMPLE pin near a fire.";
+      el.fetchStatus.className = "status-line err";
+      return { ok: false, error: "placement failed" };
+    }
+
+    const fire = bestMeta.nearest.fire;
+    const label =
+      "EXAMPLE camp (live) · near " +
+      (fire.SOURCE || "?") + " " +
+      (fire.FIRE_NUMBER || fire.LABEL || fire.INCIDENT_NAME || "fire") +
+      " · not a real LodgeX camp";
+    const name = window.sanitizeCampName(label, "EXAMPLE camp (live)");
+    if (!setCamp(name, bestPin.lat.toFixed(5), bestPin.lon.toFixed(5))) {
+      el.fetchStatus.textContent = "Invalid location";
+      el.fetchStatus.className = "status-line err";
+      return { ok: false, error: "apply failed" };
+    }
+    const whz = window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM);
+    const dist = near.length ? near[0].dist : null;
+    el.fetchStatus.textContent =
+      "Live EXAMPLE pinned · driving fire " +
+      (fire.SOURCE || "") + " " + (fire.FIRE_NUMBER || fire.LABEL || "") +
+      " (" + (fire.FIRE_STATUS || "?") + ") · nearest " +
+      (dist != null ? dist.toFixed(1) + " km" : "?") +
+      (whz.level ? " → " + whz.level.name : "");
+    el.fetchStatus.className = "status-line ok";
+    try {
+      const u = new URL(location.href);
+      u.searchParams.delete("test");
+      u.searchParams.delete("example");
+      u.searchParams.set("lat", String(camp.lat));
+      u.searchParams.set("lon", String(camp.lon));
+      u.searchParams.set("name", camp.name);
+      history.replaceState({}, "", u.pathname + u.search);
+    } catch (e) { /* ignore */ }
+    return {
+      ok: true,
+      fire,
+      anchor: bestMeta.anchor,
+      distKm: dist,
+      whz,
+      camp: { ...camp },
+    };
+  }
+
+  /** Google Maps hybrid + ECCC RDPS wind particles + optional GIBS smoke. */
+  const ML = window.MAP_LAYERS;
+  const WG = window.WIND_GRID;
+  const WP = window.WIND_PARTICLES;
+  const WS = window.WIND_STATIONS;
+  let ecccTime = null;
+  let ecccRefTime = null;
+  let hrdpsTimeMeta = null;
+  let rdpsTimeMeta = null;
+  let windTimes = [];
+  let hrdpsTimes = [];
+  let windHourOffset = 0;
+  let windGrid = null;
+  let windModelLabel = "";
+  let windField = null;
+  let windLoadGen = 0;
+  let stationLoadGen = 0;
+  let windStations = [];
+  let stationMarkers = [];
+  let mapLoadGen = 0;
+  let gmap = null;
+  let gmapReady = false;
+  let gmapFailed = false;
+  let campMarker = null;
+  let fireMarkers = [];
+  const elBg = {
+    gmapEl: document.getElementById("bgGoogleMap"),
+    fallback: document.getElementById("mapFallback"),
+    windCanvas: document.getElementById("bgWindCanvas"),
+    smoke: document.getElementById("bgSmoke"),
+    togWind: document.getElementById("togWind"),
+    togStations: document.getElementById("togStations"),
+    togSmoke: document.getElementById("togSmoke"),
+    stamp: document.getElementById("mapTimestamp"),
+    credit: document.querySelector(".map-credit"),
+    forecast: document.getElementById("windForecast"),
+    forecastLabel: document.getElementById("windForecastLabel"),
+    windStatus: document.getElementById("windStatus"),
+  };
+
+  function setWindStatus(msg, isErr) {
+    if (!elBg.windStatus) return;
+    elBg.windStatus.textContent = msg;
+    elBg.windStatus.classList.toggle("err", !!isErr);
+  }
+
+  function restoreOverlayNodes() {
+    const bgRoot = document.getElementById("bgMap");
+    if (!bgRoot) return;
+    // Maps auth failure can destroy overlay panes that briefly hosted the canvas.
+    ["bgWindCanvas", "bgSmoke"].forEach(function (id) {
+      let node = document.getElementById(id);
+      if (!node) {
+        // Recreate if Maps wiped the node entirely.
+        if (id === "bgWindCanvas") {
+          node = document.createElement("canvas");
+          node.id = "bgWindCanvas";
+          node.setAttribute("aria-hidden", "true");
+          elBg.windCanvas = node;
+          windField = null; // force recreate against new canvas
+        } else {
+          node = document.createElement("img");
+          node.id = "bgSmoke";
+          node.className = "is-off";
+          node.alt = "";
+          node.decoding = "async";
+          elBg.smoke = node;
+        }
+      }
+      if (node.parentElement !== bgRoot) {
+        // Keep fallback notice first; append overlays above the map div.
+        bgRoot.appendChild(node);
+      }
+    });
+    elBg.windCanvas = document.getElementById("bgWindCanvas");
+    elBg.smoke = document.getElementById("bgSmoke");
+  }
+
+  function applySimulatedBasemapCredit() {
+    const credit = elBg.credit || document.querySelector(".map-credit");
+    if (!credit) return;
+    if (!credit.dataset.real) {
+      credit.dataset.real = credit.textContent || "";
+    }
+    credit.textContent =
+      "Background: SIMULATED basemap (not real satellite imagery). Google Maps unavailable.";
+  }
+
+  function restoreRealBasemapCredit() {
+    const credit = elBg.credit || document.querySelector(".map-credit");
+    if (!credit) return;
+    if (credit.dataset.real) {
+      credit.textContent = credit.dataset.real;
+    }
+  }
+
+  function fillFallbackBanner(reason) {
+    if (!elBg.fallback) return;
+    elBg.fallback.classList.add("show");
+    let box = elBg.fallback.querySelector("div");
+    if (!box) {
+      box = document.createElement("div");
+      elBg.fallback.appendChild(box);
+    }
+    // N21: build with DOM nodes / textContent (no innerHTML).
+    while (box.firstChild) box.removeChild(box.firstChild);
+    const strong = document.createElement("strong");
+    strong.textContent = "Google Maps could not load — SIMULATED basemap";
+    box.appendChild(strong);
+    box.appendChild(document.createElement("br"));
+    const line1 = document.createTextNode(
+      "The background map needs a valid Maps JavaScript API key with this page’s referrer allowed (production: https://rjones-cpu.github.io/*). Localhost often shows a billing or referrer error."
+    );
+    box.appendChild(line1);
+    if (reason) {
+      box.appendChild(document.createTextNode(" " + String(reason)));
+    }
+    box.appendChild(document.createElement("br"));
+    box.appendChild(
+      document.createTextNode(
+        "SIMULATED basemap — wind particles / smoke overlays and the radar still work without the map tiles."
+      )
+    );
+  }
+
+  function showMapFallback(reason) {
+    gmapFailed = true;
+    gmapReady = false;
+    if (gmap && gmap.__radarOverlay) {
+      try { gmap.__radarOverlay.setMap(null); } catch (e) { /* ignore */ }
+      gmap.__radarOverlay = null;
+    }
+    const bgRoot = document.getElementById("bgMap");
+    if (bgRoot) bgRoot.classList.add("map-mock-sat");
+    restoreOverlayNodes();
+    fillFallbackBanner(reason);
+    applySimulatedBasemapCredit();
+    if (elBg.stamp) {
+      elBg.stamp.textContent =
+        "SIMULATED basemap · Google Maps unavailable · overlays only";
+    }
+    // Particles can still run over the dark fallback using equirectangular projection.
+    ensureWindField();
+    if (windGrid) restartWindAnimation();
+    ensureStationPaintLoop();
+    drawFallbackStationArrows();
+  }
+
+  function mapPixelSize() {
+    const w = ML.clampMapSize(window.innerWidth || 1024);
+    const h = ML.clampMapSize(window.innerHeight || 768);
+    return { w: w, h: h };
+  }
+
+  /** Zoom so ~DEFAULT_RADIUS_KM fills most of the shorter viewport side. */
+  function zoomForRadiusKm(lat, radiusKm) {
+    const r = radiusKm || (ML && ML.DEFAULT_RADIUS_KM) || 160;
+    const h = Math.max(window.innerHeight || 768, 400);
+    const metersPerPx = (r * 2000) / h;
+    const latRad = (lat * Math.PI) / 180;
+    const zoom = Math.log2((156543.03392 * Math.cos(latRad)) / metersPerPx);
+    return Math.max(4, Math.min(12, Math.round(zoom)));
+  }
+
+  /** Viewport lon/lat bounds for fallback projection (no Google Maps). */
+  function fallbackBounds() {
+    const r = (ML && ML.DEFAULT_RADIUS_KM) || 160;
+    const dLat = r / 111.32;
+    const cos = Math.cos((camp.lat * Math.PI) / 180);
+    const dLon = r / (111.32 * Math.max(cos, 0.2));
+    return {
+      west: camp.lon - dLon,
+      east: camp.lon + dLon,
+      south: camp.lat - dLat,
+      north: camp.lat + dLat,
+    };
+  }
+
+  /**
+   * IMPORTANT: project + unproject must share one path.
+   * Prefer OverlayView MapCanvasProjection (container pixels).
+   * The old map.getProjection()+bounds path disagreed with OverlayView
+   * unproject and drew particles off-screen over hybrid tiles.
+   */
+  function overlayProjection() {
+    if (!gmapReady || !gmap || !window.google || !google.maps) return null;
+    const ov = gmap.__radarOverlay;
+    if (!ov || !ov.getProjection) return null;
+    try {
+      return ov.getProjection() || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function projectLonLat(lon, lat) {
+    const w = (elBg.windCanvas && elBg.windCanvas.clientWidth) || window.innerWidth || 1;
+    const h = (elBg.windCanvas && elBg.windCanvas.clientHeight) || window.innerHeight || 1;
+    const gp = overlayProjection();
+    if (gp && gp.fromLatLngToContainerPixel) {
+      try {
+        const pt = gp.fromLatLngToContainerPixel(new google.maps.LatLng(lat, lon));
+        if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)) return { x: pt.x, y: pt.y };
+      } catch (e) { /* fall through */ }
+    }
+    const b = fallbackBounds();
+    const x = ((lon - b.west) / (b.east - b.west)) * w;
+    const y = ((b.north - lat) / (b.north - b.south)) * h;
+    return { x: x, y: y };
+  }
+
+  function unprojectXY(x, y) {
+    const w = (elBg.windCanvas && elBg.windCanvas.clientWidth) || window.innerWidth || 1;
+    const h = (elBg.windCanvas && elBg.windCanvas.clientHeight) || window.innerHeight || 1;
+    const gp = overlayProjection();
+    if (gp && gp.fromContainerPixelToLatLng) {
+      try {
+        const ll = gp.fromContainerPixelToLatLng(new google.maps.Point(x, y));
+        if (ll) return { lon: ll.lng(), lat: ll.lat() };
+      } catch (e) { /* fall through */ }
+    }
+    const b = fallbackBounds();
+    return {
+      lon: b.west + (x / w) * (b.east - b.west),
+      lat: b.north - (y / h) * (b.north - b.south),
+    };
+  }
+
+  function ensureWindField() {
+    if (!elBg.windCanvas || !WP || windField) return windField;
+    windField = WP.createParticleField(elBg.windCanvas, {
+      getUv: function (lon, lat) {
+        if (!windGrid || !WG) return null;
+        return WG.sampleUv(windGrid, lon, lat);
+      },
+      project: projectLonLat,
+      unproject: unprojectXY,
+      isVisible: function () {
+        return !!(elBg.togWind && elBg.togWind.checked);
+      },
+      afterFrame: function () {
+        // When Maps markers are unavailable, paint SWOB arrows on the wind canvas.
+        if (!gmapReady) drawFallbackStationArrows();
+      },
+    });
+    return windField;
+  }
+
+  function restartWindAnimation() {
+    const f = ensureWindField();
+    if (!f) return;
+    if (!(elBg.togWind && elBg.togWind.checked)) {
+      f.stop();
+      f.clear();
+      return;
+    }
+    if (WP && WP.prefersReducedMotion()) {
+      f.redrawStatic();
+    } else {
+      f.start();
+    }
+  }
+
+  function applyLayerVisibility() {
+    const windOn = !!(elBg.togWind && elBg.togWind.checked);
+    const smokeOn = !!(elBg.togSmoke && elBg.togSmoke.checked);
+    if (elBg.windCanvas) elBg.windCanvas.classList.toggle("is-off", !windOn);
+    if (elBg.smoke) elBg.smoke.classList.toggle("is-off", !smokeOn);
+    if (windOn) restartWindAnimation();
+    else if (windField) {
+      windField.stop();
+      windField.clear();
+    }
+  }
+
+  function attachMapsOverlayHelper() {
+    if (!gmapReady || !gmap || !window.google || !google.maps) return;
+    if (gmap.__radarOverlay) return;
+    // Projection helper only. Keep #bgWindCanvas as a sibling of #bgGoogleMap
+    // (z-index 1000) so RefererNotAllowed / billing errors cannot destroy it
+    // when Maps wipes overlay panes.
+    const Overlay = function () {};
+    Overlay.prototype = new google.maps.OverlayView();
+    Overlay.prototype.onAdd = function () {};
+    Overlay.prototype.draw = function () {
+      if (windField) windField.resize();
+    };
+    Overlay.prototype.onRemove = function () {};
+    const ov = new Overlay();
+    ov.setMap(gmap);
+    gmap.__radarOverlay = ov;
+    google.maps.event.addListener(gmap, "idle", function () {
+      if (!gmapReady || gmapFailed) return;
+      restartWindAnimation();
+      syncStationMarkers();
+    });
+    google.maps.event.addListener(gmap, "bounds_changed", function () {
+      if (windField) windField.resize();
+    });
+  }
+
+  async function refreshEcccTimeMeta() {
+    if (!WG) return null;
+    try {
+      const urls = [
+        WG.buildWindCapabilitiesUrl(WG.HRDPS_SPEED),
+        WG.buildWindCapabilitiesUrl(WG.RDPS_SPEED),
+      ];
+      const texts = await Promise.all(
+        urls.map(function (u) {
+          return fetch(u, { method: "GET", credentials: "omit" }).then(function (r) {
+            return r.ok ? r.text() : "";
+          });
+        })
+      );
+      hrdpsTimeMeta = texts[0] ? WG.parseTimeDimension(texts[0]) : null;
+      rdpsTimeMeta = texts[1] ? WG.parseTimeDimension(texts[1]) : null;
+      // Slider TIME axis: prefer RDPS (longer); default "now" from HRDPS if present else RDPS.
+      const primary = hrdpsTimeMeta && hrdpsTimeMeta.defaultTime ? hrdpsTimeMeta : rdpsTimeMeta;
+      const longAxis = rdpsTimeMeta && rdpsTimeMeta.rangeText ? rdpsTimeMeta : hrdpsTimeMeta;
+      if (primary && primary.defaultTime) ecccTime = primary.defaultTime;
+      if (primary && primary.referenceDefault) ecccRefTime = primary.referenceDefault;
+      if (longAxis && longAxis.rangeText && ecccTime) {
+        windTimes = WG.expandHourlyTimeRange(longAxis.rangeText, ecccTime, 48);
+      }
+      if (hrdpsTimeMeta && hrdpsTimeMeta.rangeText && hrdpsTimeMeta.defaultTime) {
+        hrdpsTimes = WG.expandHourlyTimeRange(
+          hrdpsTimeMeta.rangeText,
+          hrdpsTimeMeta.defaultTime,
+          48
+        );
+      } else {
+        hrdpsTimes = [];
+      }
+      if (!windTimes.length && ecccTime) windTimes = [ecccTime];
+      if (elBg.forecast) {
+        elBg.forecast.max = String(Math.max(0, windTimes.length - 1));
+        elBg.forecast.setAttribute("aria-valuemax", elBg.forecast.max);
+      }
+    } catch (e) { /* keep prior */ }
+    return ecccTime;
+  }
+
+  function selectedWindTime() {
+    if (windTimes.length) {
+      const idx = Math.max(0, Math.min(windHourOffset, windTimes.length - 1));
+      return windTimes[idx];
+    }
+    return ecccTime;
+  }
+
+  function formatInZone(iso, timeZone, shortLabel) {
+    if (!iso) return "—";
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) return String(iso);
+    try {
+      const fmt = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timeZone,
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZoneName: "short",
+      });
+      return fmt.format(new Date(ms)).replace(",", "") + " (" + shortLabel + ")";
+    } catch (e) {
+      return String(iso);
+    }
+  }
+
+  function formatUtcTooltip(iso) {
+    if (!iso) return "UTC —";
+    return (
+      "UTC: " +
+      String(iso).replace("T", " ").replace(/:00Z$/, " Z").replace(/Z$/, " Z")
+    );
+  }
+
+  /** Slider label: America/Edmonton + America/Vancouver; UTC in title tooltip. */
+  function updateForecastLabel() {
+    const t = selectedWindTime();
+    const hours =
+      windTimes.length && ecccTime && t
+        ? Math.round((Date.parse(t) - Date.parse(ecccTime)) / 3600000)
+        : windHourOffset;
+    const hourTxt = hours <= 0 ? "now" : "+" + hours + " h";
+    const mt = formatInZone(t, "America/Edmonton", "MT");
+    const pt = formatInZone(t, "America/Vancouver", "PT");
+    if (elBg.forecastLabel) {
+      elBg.forecastLabel.textContent =
+        hourTxt + " · " + mt + " · " + pt;
+      elBg.forecastLabel.title = formatUtcTooltip(t);
+      elBg.forecastLabel.setAttribute("aria-label", hourTxt + ", " + formatUtcTooltip(t));
+    }
+    if (elBg.forecast) {
+      elBg.forecast.setAttribute("aria-valuenow", String(windHourOffset));
+      elBg.forecast.value = String(windHourOffset);
+      elBg.forecast.title = formatUtcTooltip(t);
+    }
+  }
+
+  /** Radius so UV grid covers the full viewport (corners beyond WHZ ring). */
+  function windCoverRadiusKm() {
+    const base = (ML && ML.DEFAULT_RADIUS_KM) || 160;
+    // Viewport diagonal ≈ base * √2; pad ~25% so particles never hit empty UV.
+    return Math.ceil(base * 1.55);
+  }
+
+  function clampBbox(box) {
+    if (!box) return null;
+    function clamp(n, lo, hi) {
+      n = Number(n);
+      if (!Number.isFinite(n)) return null;
+      return Math.min(hi, Math.max(lo, n));
+    }
+    let west = clamp(box.west, -180, 180);
+    let east = clamp(box.east, -180, 180);
+    let south = clamp(box.south, -85, 85);
+    let north = clamp(box.north, -85, 85);
+    if (west == null || east == null || south == null || north == null) return null;
+    if (north < south) {
+      const tmp = north;
+      north = south;
+      south = tmp;
+    }
+    // Reject antimeridian / inverted / absurd spans — fall back to camp radius.
+    if (east <= west) return null;
+    if (east - west > 40 || north - south > 30) return null;
+    return { west: west, east: east, south: south, north: north };
+  }
+
+  function windCoverBbox(lat, lon) {
+    if (gmapReady && gmap && gmap.getBounds) {
+      try {
+        const b = gmap.getBounds();
+        if (b) {
+          const ne = b.getNorthEast();
+          const sw = b.getSouthWest();
+          const padLat = (ne.lat() - sw.lat()) * 0.12;
+          const padLon = (ne.lng() - sw.lng()) * 0.12;
+          const clamped = clampBbox({
+            west: sw.lng() - padLon,
+            east: ne.lng() + padLon,
+            south: sw.lat() - padLat,
+            north: ne.lat() + padLat,
+          });
+          if (clamped) return clamped;
+        }
+      } catch (e) { /* fall through */ }
+    }
+    return WG ? WG.bboxAroundCamp(lat, lon, windCoverRadiusKm()) : null;
+  }
+
+  async function loadWindGrid(lat, lon) {
+    if (!WG || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const gen = ++windLoadGen;
+    setWindStatus("Loading ECCC RDPS wind grid…", false);
+    try {
+      await refreshEcccTimeMeta();
+      if (gen !== windLoadGen) return;
+      const time = selectedWindTime();
+      updateForecastLabel();
+      const inHrdps =
+        !!(time && hrdpsTimes.length && hrdpsTimes.indexOf(time) >= 0);
+      const coverR = windCoverRadiusKm();
+      const coverBox = windCoverBbox(lat, lon);
+      const grid = await WG.fetchEcccUvGrid({
+        lat: lat,
+        lon: lon,
+        radiusKm: coverR,
+        bbox: coverBox || undefined,
+        time: time,
+        size: 36,
+        preferRdps: !inHrdps,
+      });
+      if (gen !== windLoadGen) return;
+      grid.time = time;
+      grid.referenceTime = ecccRefTime;
+      windGrid = grid;
+      windModelLabel = grid.model || (inHrdps ? "HRDPS-WEonG" : "RDPS");
+      const runLabel = formatInZone(ecccRefTime, "America/Edmonton", "MT");
+      const validLabel = formatInZone(time, "America/Edmonton", "MT");
+      setWindStatus(
+        "ECCC " +
+          windModelLabel +
+          " · run " +
+          runLabel +
+          " · valid " +
+          validLabel +
+          " · particles on",
+        false
+      );
+      if (elBg.windStatus) {
+        elBg.windStatus.title =
+          formatUtcTooltip(ecccRefTime) + " · valid " + formatUtcTooltip(time);
+      }
+      restartWindAnimation();
+      loadWindStations(lat, lon);
+    } catch (err) {
+      if (gen !== windLoadGen) return;
+      windGrid = null;
+      if (windField) {
+        windField.stop();
+        windField.clear();
+      }
+      setWindStatus(
+        "Wind forecast unavailable — could not load ECCC RDPS grid. Radar and fires still work.",
+        true
+      );
+    }
+  }
+
+
+  function drawFallbackStationArrows() {
+    if (gmapReady) return; // Google Markers handle it
+    const canvas = elBg.windCanvas;
+    if (!canvas || !(elBg.togStations && elBg.togStations.checked)) return;
+    if (!windStations || !windStations.length) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const w = canvas.clientWidth || 1;
+    const h = canvas.clientHeight || 1;
+    // Draw above particle trails without clearing them: stroke arrows each frame via separate pass.
+    windStations.forEach(function (st) {
+      const pt = projectLonLat(st.lon, st.lat);
+      if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) return;
+      if (pt.x < -20 || pt.y < -20 || pt.x > w + 20 || pt.y > h + 20) return;
+      const from = st.dirFromDeg != null ? Number(st.dirFromDeg) : 0;
+      const toRad = ((from + 180) * Math.PI) / 180;
+      const len = 18;
+      const x1 = pt.x - Math.sin(toRad) * len;
+      const y1 = pt.y + Math.cos(toRad) * len;
+      const x2 = pt.x + Math.sin(toRad) * len;
+      const y2 = pt.y - Math.cos(toRad) * len;
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      // Dark outline
+      ctx.strokeStyle = "#0b1220";
+      ctx.lineWidth = 6.5;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      // arrow head
+      const hx = x2;
+      const hy = y2;
+      const left = toRad + Math.PI * 0.82;
+      const right = toRad - Math.PI * 0.82;
+      ctx.lineTo(hx + Math.sin(left) * 10, hy - Math.cos(left) * 10);
+      ctx.moveTo(hx, hy);
+      ctx.lineTo(hx + Math.sin(right) * 10, hy - Math.cos(right) * 10);
+      ctx.stroke();
+      // Bright fill stroke
+      ctx.strokeStyle = "#f0f9ff";
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineTo(hx + Math.sin(left) * 10, hy - Math.cos(left) * 10);
+      ctx.moveTo(hx, hy);
+      ctx.lineTo(hx + Math.sin(right) * 10, hy - Math.cos(right) * 10);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  let stationPaintTimer = 0;
+  function clearStationPaintLoop() {
+    if (stationPaintTimer) {
+      window.clearInterval(stationPaintTimer);
+      stationPaintTimer = 0;
+    }
+  }
+  function ensureStationPaintLoop() {
+    if (gmapReady) {
+      clearStationPaintLoop();
+      return;
+    }
+    if (stationPaintTimer) return;
+    stationPaintTimer = window.setInterval(function () {
+      if (!(elBg.togStations && elBg.togStations.checked)) return;
+      if (gmapReady) {
+        clearStationPaintLoop();
+        return;
+      }
+      drawFallbackStationArrows();
+    }, 200);
+  }
+
+  function clearStationMarkers() {
+    stationMarkers.forEach(function (m) {
+      if (m && m.setMap) m.setMap(null);
+    });
+    stationMarkers = [];
+  }
+
+  function syncStationMarkers() {
+    clearStationMarkers();
+    if (!gmapReady || !gmap || !window.google || !google.maps) return;
+    if (!(elBg.togStations && elBg.togStations.checked)) return;
+    if (!WS) return;
+    windStations.forEach(function (st) {
+      const dirTxt = WS.dirLabel(st.dirFromDeg);
+      const spdTxt =
+        st.speedKmh != null ? Number(st.speedKmh).toFixed(1) + " km/h" : "—";
+      const fromTxt =
+        st.dirFromDeg != null
+          ? Math.round(st.dirFromDeg) + "° (" + dirTxt + ")"
+          : "—";
+      const when = st.observedAt
+        ? String(st.observedAt).replace("T", " ").replace(/\.\d+Z$/, " Z")
+        : "—";
+      const rot = st.dirFromDeg != null ? Number(st.dirFromDeg) : 0;
+      // Arrow points TO direction (meteorological FROM + 180) for visual flow.
+      const toDeg = (rot + 180) % 360;
+      const marker = new google.maps.Marker({
+        map: gmap,
+        position: { lat: st.lat, lng: st.lon },
+        title: st.name + " · " + spdTxt + " from " + fromTxt,
+        zIndex: 1200,
+        icon: {
+          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+          scale: 7,
+          rotation: toDeg,
+          fillColor: "#f0f9ff",
+          fillOpacity: 1,
+          strokeColor: "#0b1220",
+          strokeWeight: 2.4,
+          anchor: new google.maps.Point(0, 2.2),
+        },
+      });
+      const info = new google.maps.InfoWindow({
+        content:
+          "<div style=\"font:12px/1.4 Segoe UI,sans-serif;color:#142033;max-width:220px\">" +
+          "<strong>" +
+          escapeHtml(st.name) +
+          "</strong><br/>" +
+          "Wind: " +
+          escapeHtml(spdTxt) +
+          " from " +
+          escapeHtml(fromTxt) +
+          "<br/>Observed: " +
+          escapeHtml(when) +
+          "<br/><span style=\"color:#475569\">Source: ECCC SWOB</span></div>",
+      });
+      marker.addListener("click", function () {
+        info.open({ map: gmap, anchor: marker });
+      });
+      stationMarkers.push(marker);
+    });
+  }
+
+  async function loadWindStations(lat, lon) {
+    if (!WS || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    if (!(elBg.togStations && elBg.togStations.checked)) {
+      windStations = [];
+      clearStationMarkers();
+      return;
+    }
+    const gen = ++stationLoadGen;
+    try {
+      const box = windCoverBbox(lat, lon);
+      if (!box) return;
+      const end = new Date();
+      const start = new Date(end.getTime() - 3 * 3600 * 1000);
+      const datetime =
+        start.toISOString().replace(/\.\d{3}Z$/, "Z") +
+        "/" +
+        end.toISOString().replace(/\.\d{3}Z$/, "Z");
+      const list = await WS.fetchSwobStations({
+        west: box.west,
+        east: box.east,
+        south: box.south,
+        north: box.north,
+        limit: 200,
+        datetime: datetime,
+      });
+      if (gen !== stationLoadGen) return;
+      windStations = list;
+      syncStationMarkers();
+      ensureStationPaintLoop();
+      if (!gmapReady) drawFallbackStationArrows();
+      if (elBg.windStatus && !elBg.windStatus.classList.contains("err")) {
+        const base = elBg.windStatus.textContent || "";
+        if (base.indexOf("SWOB") < 0) {
+          elBg.windStatus.textContent =
+            base + " · SWOB stations " + list.length;
+        }
+      }
+    } catch (err) {
+      if (gen !== stationLoadGen) return;
+      windStations = [];
+      clearStationMarkers();
+      // Soft-fail: particles may still work
+    }
+  }
+
+    function syncGoogleMarkers() {
+    if (!gmapReady || !gmap || !window.google || !google.maps) return;
+    const pos = { lat: camp.lat, lng: camp.lon };
+    if (!campMarker) {
+      campMarker = new google.maps.Marker({
+        map: gmap,
+        position: pos,
+        title: camp.name,
+        zIndex: 1000,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#15803d",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
+        },
+      });
+    } else {
+      campMarker.setPosition(pos);
+      campMarker.setTitle(camp.name);
+    }
+    fireMarkers.forEach((m) => m.setMap(null));
+    fireMarkers = [];
+    near.forEach((f) => {
+      const col = statusColor(f.FIRE_STATUS);
+      fireMarkers.push(
+        new google.maps.Marker({
+          map: gmap,
+          position: { lat: f.lat, lng: f.lon },
+          title: (f.SOURCE ? f.SOURCE + " " : "") + (f.FIRE_NUMBER || f.LABEL || "fire"),
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: col,
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2,
+          },
+        })
+      );
+    });
+    syncStationMarkers();
+  }
+
+  function centerGoogleMap(lat, lon) {
+    if (!gmapReady || !gmap) return;
+    const z = zoomForRadiusKm(lat, ML && ML.DEFAULT_RADIUS_KM);
+    gmap.setCenter({ lat: lat, lng: lon });
+    gmap.setZoom(z);
+    syncGoogleMarkers();
+    attachMapsOverlayHelper();
+  }
+
+  function initGoogleMapInstance() {
+    if (!elBg.gmapEl || !window.google || !google.maps) {
+      showMapFallback("(Maps API missing)");
+      return;
+    }
+    try {
+      const type =
+        (window.MAPS_CONFIG && window.MAPS_CONFIG.defaultMapType) || "hybrid";
+      gmap = new google.maps.Map(elBg.gmapEl, {
+        center: { lat: camp.lat, lng: camp.lon },
+        zoom: zoomForRadiusKm(camp.lat, ML && ML.DEFAULT_RADIUS_KM),
+        mapTypeId: type === "satellite" ? "satellite" : "hybrid",
+        disableDefaultUI: true,
+        gestureHandling: "none",
+        keyboardShortcuts: false,
+        clickableIcons: false,
+        draggable: false,
+        scrollwheel: false,
+        disableDoubleClickZoom: true,
+        // Keep Google logo + Map Data attribution visible (required).
+        fullscreenControl: false,
+        streetViewControl: false,
+        mapTypeControl: false,
+        zoomControl: false,
+        backgroundColor: "#0b1220",
+      });
+      gmapReady = true;
+      gmapFailed = false;
+      const bgRoot = document.getElementById("bgMap");
+      if (bgRoot) bgRoot.classList.remove("map-mock-sat");
+      if (elBg.fallback) elBg.fallback.classList.remove("show");
+      restoreRealBasemapCredit();
+      clearStationPaintLoop();
+      syncGoogleMarkers();
+      attachMapsOverlayHelper();
+    } catch (err) {
+      showMapFallback("(init error)");
+    }
+  }
+
+  window.__onGoogleMapsReady = function () {
+    initGoogleMapInstance();
+    updateBackgroundMap(camp.lat, camp.lon);
+  };
+
+  window.gm_authFailure = function () {
+    gmapReady = false;
+    // Restore canvas before dropping gmap ref (overlay panes may already be gone).
+    showMapFallback("(Maps auth / billing / referrer rejected this origin)");
+    gmap = null;
+  };
+
+  function loadGoogleMapsScript() {
+    const cfg = window.MAPS_CONFIG || {};
+    const key = cfg.apiKey;
+    if (!key) {
+      showMapFallback("(maps-config.js apiKey missing)");
+      return;
+    }
+    if (window.google && google.maps) {
+      window.__onGoogleMapsReady();
+      return;
+    }
+    const s = document.createElement("script");
+    s.async = true;
+    s.defer = true;
+    s.src =
+      "https://maps.googleapis.com/maps/api/js?key=" +
+      encodeURIComponent(key) +
+      "&loading=async&callback=__onGoogleMapsReady";
+    s.onerror = function () {
+      showMapFallback("(script network error)");
+    };
+    document.head.appendChild(s);
+    setTimeout(function () {
+      if (!gmapReady && !gmapFailed) showMapFallback("(timed out waiting for Maps)");
+    }, 12000);
+  }
+
+  async function updateBackgroundMap(lat, lon) {
+    if (!ML || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const gen = ++mapLoadGen;
+    const sz = mapPixelSize();
+    const bbox = ML.bbox3857Around(lat, lon, ML.DEFAULT_RADIUS_KM);
+    const gibsDay = ML.gibsDateUTC();
+    const common = { lat: lat, lon: lon, bbox: bbox, width: sz.w, height: sz.h };
+    const smokeUrl = ML.buildGibsSmokeUrl(Object.assign({}, common, { time: gibsDay }));
+    if (elBg.smoke) elBg.smoke.src = smokeUrl;
+    applyLayerVisibility();
+    centerGoogleMap(lat, lon);
+    await loadWindGrid(lat, lon);
+    if (gen !== mapLoadGen) return;
+    const windTime = selectedWindTime();
+    if (elBg.stamp) {
+      const windLabel = windTime ? windTime.replace("T", " ").replace(/:00Z$/, "Z") : "—";
+      const runLabel = ecccRefTime
+        ? ecccRefTime.replace("T", " ").replace(/:00Z$/, "Z")
+        : "—";
+      const mapLabel = gmapReady ? "Google Maps hybrid" : gmapFailed ? "Maps unavailable" : "Maps loading…";
+      elBg.stamp.textContent =
+        mapLabel +
+        " · Wind particles (ECCC " + (windModelLabel || "HRDPS/RDPS") + "): valid " +
+        windLabel +
+        " · run " +
+        runLabel +
+        " · Smoke (GIBS): " +
+        gibsDay +
+        " UTC · ~" +
+        ML.DEFAULT_RADIUS_KM +
+        " km extent";
+    }
+  }
+
+  if (elBg.togWind) elBg.togWind.addEventListener("change", applyLayerVisibility);
+  if (elBg.togSmoke) elBg.togSmoke.addEventListener("change", applyLayerVisibility);
+  if (elBg.togStations) {
+    elBg.togStations.addEventListener("change", function () {
+      if (elBg.togStations.checked) loadWindStations(camp.lat, camp.lon);
+      else {
+        windStations = [];
+        clearStationMarkers();
+      }
+    });
+  }
+  let forecastTimer = null;
+  if (elBg.forecast) {
+    elBg.forecast.addEventListener("input", function () {
+      const v = parseInt(elBg.forecast.value, 10);
+      windHourOffset = Number.isFinite(v) ? Math.max(0, Math.min(v, 48)) : 0;
+      updateForecastLabel();
+      clearTimeout(forecastTimer);
+      forecastTimer = setTimeout(function () {
+        loadWindGrid(camp.lat, camp.lon).then(function () {
+          const windTime = selectedWindTime();
+          if (elBg.stamp && ML) {
+            const windLabel = windTime ? windTime.replace("T", " ").replace(/:00Z$/, "Z") : "—";
+            const runLabel = ecccRefTime
+              ? ecccRefTime.replace("T", " ").replace(/:00Z$/, "Z")
+              : "—";
+            const mapLabel = gmapReady ? "Google Maps hybrid" : gmapFailed ? "Maps unavailable" : "Maps loading…";
+            elBg.stamp.textContent =
+              mapLabel +
+              " · Wind particles (ECCC " + (windModelLabel || "HRDPS/RDPS") + "): valid " +
+              windLabel +
+              " · run " +
+              runLabel +
+              " · ~" +
+              ML.DEFAULT_RADIUS_KM +
+              " km extent";
+          }
+        });
+      }, 280);
+    });
+  }
+  let mapResizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(mapResizeTimer);
+    mapResizeTimer = setTimeout(() => {
+      if (gmapReady && gmap && google.maps && google.maps.event) {
+        google.maps.event.trigger(gmap, "resize");
+      }
+      if (windField) windField.resize();
+      updateBackgroundMap(camp.lat, camp.lon);
+    }, 400);
+  });
+  ensureWindField();
+  loadGoogleMapsScript();
+
+  function recomputeNear() {
+    near = fires
+      .map((f) => {
+        const lat = f.LATITUDE;
+        const lon = f.LONGITUDE;
+        const dist = haversineKm(camp.lat, camp.lon, lat, lon);
+        const brg = bearingDeg(camp.lat, camp.lon, lat, lon);
+        return { ...f, dist, brg, lat, lon };
+      })
+      .filter((f) => f.dist <= RADIUS_KM)
+      .sort((a, b) => a.dist - b.dist);
+    el.nearCount.textContent = String(near.length);
+    updateWhzUi();
+    syncGoogleMarkers();
+  }
+
+  function renderList() {
+    el.fireList.innerHTML = "";
+    if (near.length === 0) {
+      el.emptyMsg.style.display = "block";
+      el.emptyMsg.textContent = "No active wildfires within 150 km";
+      return;
+    }
+    el.emptyMsg.style.display = "none";
+    near.forEach((f, i) => {
+      const li = document.createElement("li");
+      li.dataset.idx = String(i);
+      const ha = f.AREA_ESTIMATE != null ? Number(f.AREA_ESTIMATE).toLocaleString() : "—";
+      const src = (f.SOURCE || "?").toUpperCase();
+      const srcClass = src === "BC" ? "bc" : "ab";
+      const num = f.FIRE_NUMBER || f.LABEL || "Unknown";
+      li.innerHTML =
+        `<div class="name"><span class="src-badge ${srcClass}">${escapeHtml(src)}</span>${escapeHtml(num)}</div>` +
+        `<div class="detail">` +
+        `Status: <strong style="color:${statusTextColor(f.FIRE_STATUS)}">${escapeHtml(f.FIRE_STATUS || "—")}</strong><br/>` +
+        `Size: ${ha} ha · Distance: ${f.dist.toFixed(1)} km · Bearing: ${f.brg.toFixed(0)}°<br/>` +
+        `Location: ${f.lat.toFixed(5)}, ${f.lon.toFixed(5)}` +
+        `</div>`;
+      li.addEventListener("mouseenter", () => { hoverIdx = i; });
+      li.addEventListener("mouseleave", () => { hoverIdx = -1; });
+      el.fireList.appendChild(li);
+    });
+  }
+
+
+  function coordsFromFeature(ft, p) {
+    let lat = p.LATITUDE;
+    let lon = p.LONGITUDE;
+    if ((lat == null || lon == null) && ft.geometry && ft.geometry.coordinates) {
+      lon = ft.geometry.coordinates[0];
+      lat = ft.geometry.coordinates[1];
+    }
+    return { lat: Number(lat), lon: Number(lon) };
+  }
+
+  function parseAbFeatures(geojson) {
+    const features = (geojson && geojson.features) || [];
+    return features.map((ft) => {
+      const p = ft.properties || {};
+      const { lat, lon } = coordsFromFeature(ft, p);
+      const num = p.FIRE_NUMBER || p.LABEL || null;
+      return {
+        LABEL: p.LABEL || num,
+        FIRE_NUMBER: num,
+        FIRE_STATUS: p.FIRE_STATUS,
+        AREA_ESTIMATE: p.AREA_ESTIMATE,
+        LATITUDE: lat,
+        LONGITUDE: lon,
+        SOURCE: "AB",
+      };
+    }).filter((f) => Number.isFinite(f.LATITUDE) && Number.isFinite(f.LONGITUDE));
+  }
+
+  function parseBcFeatures(geojson) {
+    const features = (geojson && geojson.features) || [];
+    return features.map((ft) => {
+      const p = ft.properties || {};
+      const { lat, lon } = coordsFromFeature(ft, p);
+      const num = p.FIRE_NUMBER || p.INCIDENT_NAME || null;
+      return {
+        LABEL: num,
+        FIRE_NUMBER: num,
+        FIRE_STATUS: p.FIRE_STATUS,
+        AREA_ESTIMATE: p.CURRENT_SIZE != null ? p.CURRENT_SIZE : null,
+        LATITUDE: lat,
+        LONGITUDE: lon,
+        SOURCE: "BC",
+      };
+    }).filter((f) => Number.isFinite(f.LATITUDE) && Number.isFinite(f.LONGITUDE));
+  }
+
+  async function fetchOneFeed(url, label) {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(label + " HTTP " + res.status);
+    return res.json();
+  }
+
+  async function fetchFires() {
+    if (TEST_MODE) {
+      fires = TEST_FIRES.map((f) => ({ ...f }));
+      lastFetchOk = true;
+      feedStatus = { ab: "ok", bc: "ok" };
+      const abN = fires.filter((f) => f.SOURCE === "AB").length;
+      const bcN = fires.filter((f) => f.SOURCE === "BC").length;
+      el.abCount.textContent = String(abN) + " (test)";
+      el.bcCount.textContent = String(bcN) + " (test)";
+      el.lastUpdated.textContent = new Date().toLocaleString("en-CA", {
+        timeZone: "America/Edmonton",
+        hour12: false,
+      }) + " MT (TEST)";
+      el.fetchStatus.textContent = "Using TEST DATA — not live AB/BC feeds";
+      el.fetchStatus.className = "status-line err";
+      recomputeNear();
+      renderList();
+      return;
+    }
+
+    el.fetchStatus.textContent = "Fetching AB + BC wildfire feeds…";
+    el.fetchStatus.className = "status-line";
+
+    const [abResult, bcResult] = await Promise.allSettled([
+      fetchOneFeed(API_AB, "AB"),
+      fetchOneFeed(API_BC, "BC"),
+    ]);
+
+    const next = [];
+    const parts = [];
+
+    if (abResult.status === "fulfilled") {
+      const abFires = parseAbFeatures(abResult.value);
+      next.push(...abFires);
+      feedStatus.ab = "ok";
+      el.abCount.textContent = String(abFires.length);
+      parts.push("AB OK (" + abFires.length + ")");
+    } else {
+      feedStatus.ab = "error";
+      el.abCount.textContent = "error";
+      const msg = abResult.reason && abResult.reason.message ? abResult.reason.message : String(abResult.reason);
+      parts.push("AB failed: " + msg);
+      // Keep previously loaded AB fires if any
+      next.push(...fires.filter((f) => f.SOURCE === "AB"));
+    }
+
+    if (bcResult.status === "fulfilled") {
+      const bcFires = parseBcFeatures(bcResult.value);
+      next.push(...bcFires);
+      feedStatus.bc = "ok";
+      el.bcCount.textContent = String(bcFires.length);
+      parts.push("BC OK (" + bcFires.length + ")");
+    } else {
+      feedStatus.bc = "error";
+      el.bcCount.textContent = "error";
+      const msg = bcResult.reason && bcResult.reason.message ? bcResult.reason.message : String(bcResult.reason);
+      parts.push("BC failed: " + msg);
+      next.push(...fires.filter((f) => f.SOURCE === "BC"));
+    }
+
+    fires = next;
+    lastFetchOk = feedStatus.ab === "ok" || feedStatus.bc === "ok";
+    el.lastUpdated.textContent = new Date().toLocaleString("en-CA", {
+      timeZone: "America/Edmonton",
+      hour12: false,
+    }) + " MT";
+
+    const bothOk = feedStatus.ab === "ok" && feedStatus.bc === "ok";
+    el.fetchStatus.textContent = parts.join(" · ");
+    el.fetchStatus.className = "status-line " + (bothOk ? "ok" : lastFetchOk ? "" : "err");
+
+    recomputeNear();
+    renderList();
+    if (exampleAutoPending && lastFetchOk) {
+      exampleAutoPending = false;
+      applyLiveExampleFromFeed(fires);
+    }
+  }
+
+  // --- Radar drawing ---
+  function drawRadar() {
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const maxR = Math.min(cx, cy) - 18;
+
+    ctx.clearRect(0, 0, w, h);
+    // No disc fill — radar canvas is fully transparent over the background map.
+
+    function strokeHaloCircle(x, y, r, color, width) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = width + 3;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.stroke();
+    }
+    function strokeHaloLine(x1, y1, x2, y2, color, width) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = width + 3;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.stroke();
+    }
+
+    // range rings (white halo + dark green) for ≥3:1 over light and dark map tones
+    RINGS.forEach((km) => {
+      const r = (km / RADIUS_KM) * maxR;
+      strokeHaloCircle(cx, cy, r, "#14532d", 2);
+      ctx.font = "bold 11px Segoe UI, sans-serif";
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.strokeText(km + " km", cx + 4, cy - r + 12);
+      ctx.fillStyle = "#14532d";
+      ctx.fillText(km + " km", cx + 4, cy - r + 12);
+    });
+
+    // crosshairs with halo
+    strokeHaloLine(cx - maxR, cy, cx + maxR, cy, "#14532d", 1.5);
+    strokeHaloLine(cx, cy - maxR, cx, cy + maxR, "#14532d", 1.5);
+
+    // cardinal labels
+    ctx.font = "bold 12px Segoe UI, sans-serif";
+    ctx.textAlign = "center";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    [["N", cx, cy - maxR + 14], ["S", cx, cy + maxR - 6], ["W", cx - maxR + 12, cy + 4], ["E", cx + maxR - 12, cy + 4]].forEach(([lab, x, y]) => {
+      ctx.strokeText(lab, x, y);
+      ctx.fillStyle = "#142033";
+      ctx.fillText(lab, x, y);
+    });
+    ctx.textAlign = "start";
+
+    // sweep wedge (low-opacity so map stays visible) + haloed leading edge
+    const sweepWidth = Math.PI / 5;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, maxR, sweep - sweepWidth, sweep, false);
+    ctx.closePath();
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
+    g.addColorStop(0, "rgba(21, 128, 61, 0.22)");
+    g.addColorStop(1, "rgba(21, 128, 61, 0.02)");
+    ctx.fillStyle = g;
+    ctx.fill();
+    strokeHaloLine(cx, cy, cx + Math.cos(sweep) * maxR, cy + Math.sin(sweep) * maxR, "#14532d", 2.5);
+    ctx.restore();
+
+    // fire pings — bearing 0 = north = up; canvas angle 0 = east, so convert
+    near.forEach((f, i) => {
+      const ang = ((f.brg - 90) * Math.PI) / 180; // 0° north → canvas
+      const r = (f.dist / RADIUS_KM) * maxR;
+      const x = cx + Math.cos(ang) * r;
+      const y = cy + Math.sin(ang) * r;
+      const col = statusColor(f.FIRE_STATUS);
+      const highlight = i === hoverIdx;
+
+      // pulse ring when sweep passes
+      const sweepAng = ((sweep % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const pingAng = ((ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      let delta = Math.abs(sweepAng - pingAng);
+      if (delta > Math.PI) delta = Math.PI * 2 - delta;
+      const pulse = delta < 0.25 ? (1 - delta / 0.25) : 0;
+
+      if (pulse > 0 || highlight) {
+        ctx.beginPath();
+        ctx.arc(x, y, 10 + pulse * 14, 0, Math.PI * 2);
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = 0.35 + pulse * 0.5;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.beginPath();
+      ctx.arc(x, y, highlight ? 7 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, highlight ? 7 : 5, 0, Math.PI * 2);
+      ctx.strokeStyle = "#142033";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // label
+      ctx.font = (highlight ? "bold " : "") + "11px Segoe UI, sans-serif";
+      const tag = (f.SOURCE ? f.SOURCE + " " : "") + (f.FIRE_NUMBER || f.LABEL || "?");
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.strokeText(tag, x + 9, y - 6);
+      ctx.fillStyle = "#142033";
+      ctx.fillText(tag, x + 9, y - 6);
+    });
+
+    // camp center
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#15803d";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.strokeStyle = "#142033";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    sweep += 0.018;
+    requestAnimationFrame(drawRadar);
+  }
+
+  // Click radar → set camp from polar coords
+  canvas.addEventListener("click", (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (ev.clientX - rect.left) * scaleX;
+    const y = (ev.clientY - rect.top) * scaleY;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const maxR = Math.min(cx, cy) - 18;
+    const dx = x - cx;
+    const dy = y - cy;
+    const rPx = Math.sqrt(dx * dx + dy * dy);
+    if (rPx > maxR) return;
+    const distKm = (rPx / maxR) * RADIUS_KM;
+    // canvas angle: 0 east, CW; convert to bearing from north
+    let brg = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+    if (brg < 0) brg += 360;
+    const dest = destination(camp.lat, camp.lon, distKm, brg);
+    // Click moves the *camp* to that geographic point (re-center radar)
+    // toFixed(5): destination() yields long floats; parseStrictDecimal caps at 8 decimals (SOC 2 B1)
+    if (!setCamp(camp.name, dest.lat.toFixed(5), dest.lon.toFixed(5))) {
+      el.fetchStatus.textContent = "Invalid location";
+      el.fetchStatus.className = "status-line err";
+      return;
+    }
+    el.fetchStatus.textContent = "Camp pin moved via radar click · " + dest.lat.toFixed(5) + ", " + dest.lon.toFixed(5);
+    el.fetchStatus.className = "status-line ok";
+  });
+
+  document.getElementById("btnRefresh").addEventListener("click", () => fetchFires());
+
+  // init — optional ?lat=&lon=&name= (validated); default remains Hinton TEST pin
+  const fromQuery = window.parseCampQueryParams(params, "Camp from URL");
+  if (fromQuery.ok) {
+    setCamp(fromQuery.name, Number(fromQuery.lat).toFixed(5), Number(fromQuery.lon).toFixed(5));
+  } else {
+    setCamp(DEFAULT.name, Number(DEFAULT.lat).toFixed(5), Number(DEFAULT.lon).toFixed(5));
+  }
+  fetchFires();
+  setInterval(fetchFires, REFRESH_MS);
+  if (ML) setInterval(() => updateBackgroundMap(camp.lat, camp.lon), ML.MAP_REFRESH_MS);
+  requestAnimationFrame(drawRadar);
+
+  // Expose for headless tests
+  window.__radar = {
+    getState: () => ({
+      camp,
+      fires: fires.length,
+      ab: fires.filter((f) => f.SOURCE === "AB").length,
+      bc: fires.filter((f) => f.SOURCE === "BC").length,
+      near: near.map((f) => ({ label: f.FIRE_NUMBER || f.LABEL, dist: f.dist, brg: f.brg, status: f.FIRE_STATUS, source: f.SOURCE })),
+      test: TEST_MODE,
+      lastFetchOk,
+      feedStatus,
+      whz: window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM),
+      map: {
+        ecccTime,
+        ecccRefTime,
+        windValidTime: selectedWindTime(),
+        windHourOffset,
+        gibsDate: ML ? ML.gibsDateUTC() : null,
+        googleReady: gmapReady,
+        googleFailed: gmapFailed,
+        wind: !!(elBg.togWind && elBg.togWind.checked),
+        smoke: !!(elBg.togSmoke && elBg.togSmoke.checked),
+        windParticles: true,
+        windModel: windModelLabel || null,
+        stations: windStations.length,
+        layers: ML ? ML.LAYERS : null,
+        basemap: "google-maps-hybrid",
+      },
+    }),
+    fetchFires,
+    applyLiveExampleFromFeed,
+    updateBackgroundMap,
+  };
+})();
+  </script>
+  </div><!-- .app-shell -->
+</body>
+</html>
