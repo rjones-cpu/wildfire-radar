@@ -132,7 +132,33 @@
     return bestScore > 0 ? best : null;
   }
 
+
+  /**
+   * Marker / swatch colours (graphics ≥3:1 on light surfaces). Not for panel body text.
+   */
+  function statusColor(status) {
+    var s = String(status || "").toLowerCase();
+    if (s.indexOf("out of control") >= 0) return "#b91c1c";
+    if (s.indexOf("being held") >= 0) return "#b45309";
+    if (s.indexOf("under control") >= 0) return "#1d4ed8";
+    return "#4b5563";
+  }
+
+  /**
+   * Panel text colours for fire status (≥4.5:1 on rgba(255,255,255,0.88) over #000).
+   * Being Held uses --amber-text #92400e; graphics keep #b45309 via statusColor.
+   */
+  function statusTextColor(status) {
+    var s = String(status || "").toLowerCase();
+    if (s.indexOf("out of control") >= 0) return "#b91c1c";
+    if (s.indexOf("being held") >= 0) return "#92400e";
+    if (s.indexOf("under control") >= 0) return "#1d4ed8";
+    return "#4b5563";
+  }
+
   g.escapeHtml = escapeHtml;
+  g.statusColor = statusColor;
+  g.statusTextColor = statusTextColor;
   g.safeRouteColor = safeRouteColor;
   g.ROUTE_COLOR_ALLOWLIST = ROUTE_COLOR_ALLOWLIST;
   g.parseStrictDecimal = parseStrictDecimal;

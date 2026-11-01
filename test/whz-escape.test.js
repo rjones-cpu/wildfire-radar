@@ -29,7 +29,7 @@ vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(root, "radar-security.js"), "utf8"), sandbox);
 vm.runInContext(fs.readFileSync(path.join(root, "plan-data.js"), "utf8"), sandbox);
 
-const { escapeHtml, safeRouteColor, computeWhzLevel, WILDFIRE_PLAN, validateCampCoords, sanitizeCampName, parseCampQueryParams, pickLiveExampleFire, parseStrictDecimal } = sandbox;
+const { escapeHtml, safeRouteColor, computeWhzLevel, WILDFIRE_PLAN, validateCampCoords, sanitizeCampName, parseCampQueryParams, pickLiveExampleFire, parseStrictDecimal, statusColor, statusTextColor } = sandbox;
 
 assert(typeof computeWhzLevel === "function", "computeWhzLevel exported");
 assert(WILDFIRE_PLAN && WILDFIRE_PLAN.whzLevels.length === 4, "plan levels present");
@@ -151,6 +151,26 @@ assert(contrastRatio("14532d", panelOverBlack) >= 4.5, "green-text #14532d ≥4.
 assert(contrastRatio("92400e", panelOverBlack) >= 4.5, "amber-text #92400e ≥4.5:1 on 0.88 white/#000");
 assert(contrastRatio("142033", panelOverBlack) >= 4.5, "body text ≥4.5:1 on 0.88 white/#000");
 assert(contrastRatio("5a6b7d", panelOverBlack) < 4.5, "old muted would fail (sanity)");
+
+// --- status text vs graphic colours (fire list uses statusTextColor) ---
+assert(typeof statusColor === "function" && typeof statusTextColor === "function", "statusColor/statusTextColor exported");
+assert(statusColor("Being Held") === "#b45309", "graphic Being Held stays #b45309");
+assert(statusTextColor("Being Held") === "#92400e", "text Being Held uses #92400e / amber-text");
+assert(statusColor("Out of Control") === statusTextColor("Out of Control") && statusColor("Out of Control") === "#b91c1c", "OOC text=graphic #b91c1c");
+assert(statusColor("Under Control") === statusTextColor("Under Control") && statusColor("Under Control") === "#1d4ed8", "UC text=graphic #1d4ed8");
+assert(statusTextColor("Unknown") === "#4b5563", "text default");
+const panelBlack2 = compositeWhiteOver(0.88, "#000000");
+["Out of Control", "Being Held", "Under Control", "Other"].forEach((st) => {
+  const fg = statusTextColor(st);
+  const r = contrastRatio(fg, panelBlack2);
+  assert(r >= 4.5, "statusTextColor(" + st + ") ≥4.5:1 on 0.88/#000 (got " + r.toFixed(2) + ")");
+});
+assert(contrastRatio("#b45309", panelBlack2) < 4.5, "graphic Held #b45309 would fail as panel text (sanity)");
+const indexHtml = fs.readFileSync(path.join(root, "index.html"), "utf8");
+assert(indexHtml.includes("statusTextColor(f.FIRE_STATUS)"), "fire list uses statusTextColor");
+assert(indexHtml.indexOf("statusColor(f.FIRE_STATUS)") === indexHtml.lastIndexOf("statusColor(f.FIRE_STATUS)"), "statusColor only used once (radar markers)");
+assert(/const col = statusColor\(f\.FIRE_STATUS\)/.test(indexHtml), "radar markers still use statusColor");
+
 if (failed) {
   console.error("\n" + failed + " failure(s)");
   process.exit(1);

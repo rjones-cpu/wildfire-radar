@@ -325,7 +325,7 @@
     }
     .whz-banner .level.none { background:#eef2f7; color: #4b5563; border-color:#c5ced8; }
     .whz-banner .level.alert { background:#dcfce7; color: #166534; border-color:#15803d; }
-    .whz-banner .level.level1 { background:#fff4d6; color: #92400e; border-color:#e0b84a; }
+    .whz-banner .level.level1 { background:#fff4d6; color: var(--amber-text); border-color:#e0b84a; }
     .whz-banner .level.level2 { background:#ffedd5; color: #9a3412; border-color:#f0a060; }
     .whz-banner .level.level3 { background:#ffe0e0; color: #a32020; border-color:#e07070; }
     .whz-banner .reason { color: var(--muted); flex: 1; min-width: 200px; }
@@ -763,14 +763,11 @@
     return { lat: toDeg(φ2), lon: ((toDeg(λ2) + 540) % 360) - 180 };
   }
 
-  function statusColor(status) {
-    const s = (status || "").toLowerCase();
-    if (s.includes("out of control")) return "#b91c1c";
-    if (s.includes("being held")) return "#b45309";
-    if (s.includes("under control")) return "#1d4ed8";
-    return "#4b5563";
+  const statusColor = window.statusColor;
+  const statusTextColor = window.statusTextColor;
+  if (typeof statusColor !== "function" || typeof statusTextColor !== "function") {
+    console.error("radar-security.js statusColor/statusTextColor missing");
   }
-
 
   const PLAN = window.WILDFIRE_PLAN;
   if (!PLAN) {
@@ -1101,7 +1098,7 @@
       li.innerHTML =
         `<div class="name"><span class="src-badge ${srcClass}">${escapeHtml(src)}</span>${escapeHtml(num)}</div>` +
         `<div class="detail">` +
-        `Status: <strong style="color:${statusColor(f.FIRE_STATUS)}">${escapeHtml(f.FIRE_STATUS || "—")}</strong><br/>` +
+        `Status: <strong style="color:${statusTextColor(f.FIRE_STATUS)}">${escapeHtml(f.FIRE_STATUS || "—")}</strong><br/>` +
         `Size: ${ha} ha · Distance: ${f.dist.toFixed(1)} km · Bearing: ${f.brg.toFixed(0)}°<br/>` +
         `Location: ${f.lat.toFixed(5)}, ${f.lon.toFixed(5)}` +
         `</div>`;
@@ -1116,6 +1113,7 @@
   if (typeof escapeHtml !== "function" || typeof safeRouteColor !== "function") {
     console.error("radar-security.js missing");
   }
+  // Fire-list status uses statusTextColor (panel text); radar markers use statusColor (graphics).
 
   function coordsFromFeature(ft, p) {
     let lat = p.LATITUDE;
