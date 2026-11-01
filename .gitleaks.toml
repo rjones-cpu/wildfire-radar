@@ -1,0 +1,12 @@
+# Maps browser key allowlist + keep default gitleaks rules (SOC 2 B1).
+# maps-config.js holds a Maps JavaScript API *browser* key restricted by
+# HTTP referrer to https://rjones-cpu.github.io/* (Maps JS API only).
+# Not a server secret; client-side embed is intentional for GitHub Pages.
+title = "wildfire-radar"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public Maps JS browser key (referrer-restricted)"
+paths = ['''maps-config\.js$''']
