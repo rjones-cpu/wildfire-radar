@@ -80,6 +80,12 @@ Authority boundary: UI surfaces plan actions; **evacuation order remains with TC
 
 ---
 
+## 6c. HRDPS + SWOB stations (Ralph 2026-11-01 follow-up)
+
+- Research in `WIND-SOURCES.md`. Primary particles: **HRDPS-WEonG 2.5 km**; RDPS fallback for longer TIME.
+- Observed winds: **ECCC SWOB** station markers. Rejected: Open-Meteo free (non-commercial), BCWS Access Only + empty probe, ACIS no CORS API, NOAA HRRR CONUS, NASA forecast.
+- SOC 2 B1 fix in `expandHourlyTimeRange` (PT0H / bad period → `[]`, max 500 steps) plus coverage allowlist + WCS body size cap.
+
 ## 7. Local run
 
 ```bash

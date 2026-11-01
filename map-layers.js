@@ -18,8 +18,11 @@
   /** Verified layer / coverage ids (probed 2026-11-01). */
   var LAYERS = {
     // WCS coverages used for particle UV field (not WMS arrow images).
-    ecccWindSpeed: "RDPS_10km_WindSpeed_10m",
-    ecccWindDir: "RDPS_10km_WindDir_10m",
+    // Primary HRDPS; RDPS kept as documented fallback ids.
+    ecccWindSpeed: "HRDPS-WEonG_2.5km_WindSpeed",
+    ecccWindDir: "HRDPS-WEonG_2.5km_WindDir",
+    ecccWindSpeedRdps: "RDPS_10km_WindSpeed_10m",
+    ecccWindDirRdps: "RDPS_10km_WindDir_10m",
     // Legacy WMS arrow layer id kept only for docs/tests of old GetMap path removal.
     ecccWindArrowsLegacy: "RDPS_10km_Winds_10m",
     gibsBase: "MODIS_Terra_CorrectedReflectance_TrueColor",

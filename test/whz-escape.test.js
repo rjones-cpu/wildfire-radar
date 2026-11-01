@@ -30,9 +30,10 @@ vm.runInContext(fs.readFileSync(path.join(root, "radar-security.js"), "utf8"), s
 vm.runInContext(fs.readFileSync(path.join(root, "plan-data.js"), "utf8"), sandbox);
 vm.runInContext(fs.readFileSync(path.join(root, "map-layers.js"), "utf8"), sandbox);
 vm.runInContext(fs.readFileSync(path.join(root, "wind-grid.js"), "utf8"), sandbox);
+vm.runInContext(fs.readFileSync(path.join(root, "wind-stations.js"), "utf8"), sandbox);
 vm.runInContext(fs.readFileSync(path.join(root, "wind-particles.js"), "utf8"), sandbox);
 
-const { escapeHtml, safeRouteColor, computeWhzLevel, WILDFIRE_PLAN, validateCampCoords, sanitizeCampName, parseCampQueryParams, pickLiveExampleFire, parseStrictDecimal, statusColor, statusTextColor, MAP_LAYERS, WIND_GRID, WIND_PARTICLES } = sandbox;
+const { escapeHtml, safeRouteColor, computeWhzLevel, WILDFIRE_PLAN, validateCampCoords, sanitizeCampName, parseCampQueryParams, pickLiveExampleFire, parseStrictDecimal, statusColor, statusTextColor, MAP_LAYERS, WIND_GRID, WIND_STATIONS, WIND_PARTICLES } = sandbox;
 
 assert(typeof computeWhzLevel === "function", "computeWhzLevel exported");
 assert(WILDFIRE_PLAN && WILDFIRE_PLAN.whzLevels.length === 4, "plan levels present");
@@ -180,8 +181,8 @@ assert(/const col = statusColor\(f\.FIRE_STATUS\)/.test(indexHtml), "radar marke
 assert(MAP_LAYERS && typeof MAP_LAYERS.buildGibsSmokeUrl === "function", "MAP_LAYERS exported");
 assert(MAP_LAYERS.ECCC_WMS === "https://geo.weather.gc.ca/geomet", "ECCC endpoint");
 assert(MAP_LAYERS.GIBS_WMS.indexOf("gibs.earthdata.nasa.gov") >= 0, "GIBS endpoint");
-assert(MAP_LAYERS.LAYERS.ecccWindSpeed === "RDPS_10km_WindSpeed_10m", "wind speed WCS coverage id");
-assert(MAP_LAYERS.LAYERS.ecccWindDir === "RDPS_10km_WindDir_10m", "wind dir WCS coverage id");
+assert(MAP_LAYERS.LAYERS.ecccWindSpeed === "HRDPS-WEonG_2.5km_WindSpeed", "primary HRDPS wind speed id");
+assert(MAP_LAYERS.LAYERS.ecccWindDir === "HRDPS-WEonG_2.5km_WindDir", "primary HRDPS wind dir id");
 assert(typeof MAP_LAYERS.buildEcccWindSpeedUrl !== "function", "legacy buildEcccWindSpeedUrl removed");
 assert(typeof MAP_LAYERS.buildEcccWindDirUrl !== "function", "legacy buildEcccWindDirUrl (WMS arrows) removed");
 assert(MAP_LAYERS.LAYERS.gibsBase === "MODIS_Terra_CorrectedReflectance_TrueColor", "GIBS base layer");
@@ -198,7 +199,7 @@ assert(baseUrl.indexOf("TIME=2026-10-31") >= 0, "base TIME");
 const smokeUrl = MAP_LAYERS.buildGibsSmokeUrl({ lat: 53.42, lon: -117.5, width: 640, height: 640, time: "2026-10-31" });
 assert(smokeUrl.indexOf("OMPS_Aerosol_Index") >= 0, "smoke layer in URL");
 const capUrl = MAP_LAYERS.buildEcccCapabilitiesUrl();
-assert(capUrl.indexOf("GetCapabilities") >= 0 && capUrl.indexOf("RDPS_10km_WindSpeed_10m") >= 0, "capabilities URL defaults to RDPS WindSpeed");
+assert(capUrl.indexOf("GetCapabilities") >= 0 && capUrl.indexOf("HRDPS-WEonG_2.5km_WindSpeed") >= 0, "capabilities URL defaults to HRDPS WindSpeed");
 const parsed = MAP_LAYERS.parseEcccDefaultTime('<Dimension name="time" units="ISO8601" default="2026-11-01T01:00:00Z" nearestValue="0">x</Dimension>');
 assert(parsed === "2026-11-01T01:00:00Z", "parseEcccDefaultTime");
 
@@ -251,10 +252,80 @@ const times = WIND_GRID.expandHourlyTimeRange(
 assert(times[0] === "2026-11-01T16:00:00Z", "forecast starts at default");
 assert(times.length === 49, "48h inclusive hourly count (got " + times.length + ")");
 assert(times[times.length - 1] === "2026-11-03T16:00:00Z", "forecast ends +48h");
+const emptyStep = WIND_GRID.expandHourlyTimeRange(
+  "2026-11-01T12:00:00Z/2026-11-05T00:00:00Z/PT0H",
+  "2026-11-01T16:00:00Z",
+  48
+);
+assert(Array.isArray(emptyStep) && emptyStep.length === 0, "PT0H returns [] (SOC 2 B1)");
+const badPeriod = WIND_GRID.expandHourlyTimeRange(
+  "2026-11-01T12:00:00Z/2026-11-05T00:00:00Z/PTxx",
+  "2026-11-01T16:00:00Z",
+  48
+);
+assert(badPeriod.length === 0, "unparseable period returns []");
+assert(WIND_GRID.isAllowedCoverageId("HRDPS-WEonG_2.5km_WindSpeed"), "HRDPS speed allowlisted");
+assert(WIND_GRID.isAllowedCoverageId("RDPS_10km_WindDir_10m"), "RDPS dir allowlisted");
+assert(!WIND_GRID.isAllowedCoverageId("EVIL_LAYER"), "unknown coverage rejected");
+let threw = false;
+try {
+  WIND_GRID.buildWcsAaigridUrl("EVIL_LAYER", {
+    west: -118, east: -116, south: 52, north: 54, size: 12, time: "2026-11-01T16:00:00Z",
+  });
+} catch (e) {
+  threw = /allowlist/i.test(String(e && e.message));
+}
+assert(threw, "buildWcsAaigridUrl throws on non-allowlisted id");
+assert(WIND_STATIONS && typeof WIND_STATIONS.parseSwobFeatureCollection === "function", "WIND_STATIONS exported");
+const swobFc = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [-117.5, 53.5] },
+      properties: {
+        "stn_nam-value": "Testville",
+        avg_wnd_spd_10m_pst10mts: 12.5,
+        avg_wnd_dir_10m_pst10mts: 270,
+        "date_tm-value": "2026-11-01T15:00:00.000Z",
+      },
+    },
+    {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [-117.5, 53.5] },
+      properties: {
+        "stn_nam-value": "Testville",
+        avg_wnd_spd_10m_pst10mts: 14,
+        avg_wnd_dir_10m_pst10mts: 280,
+        "date_tm-value": "2026-11-01T16:00:00.000Z",
+      },
+    },
+    {
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [-200, 53.5] },
+      properties: { "stn_nam-value": "Bad", avg_wnd_spd_10m_pst10mts: 1, avg_wnd_dir_10m_pst10mts: 10 },
+    },
+  ],
+};
+const stations = WIND_STATIONS.parseSwobFeatureCollection(swobFc);
+assert(stations.length === 1, "SWOB dedupe by name");
+assert(stations[0].speedKmh === 14 && stations[0].dirFromDeg === 280, "SWOB keeps latest obs");
+assert(WIND_STATIONS.validateStation({ name: "x", lat: 53, lon: -117, speedKmh: 999, dirFromDeg: 10 }) === null, "reject absurd station speed");
+assert(WIND_STATIONS.dirLabel(0) === "N" && WIND_STATIONS.dirLabel(90) === "E", "dirLabel compass");
+const swobUrl = WIND_STATIONS.buildSwobUrl({
+  west: -118, east: -116, south: 52, north: 54, limit: 50,
+  datetime: "2026-11-01T12:00:00Z/2026-11-01T16:00:00Z",
+});
+assert(swobUrl.indexOf("api.weather.gc.ca") >= 0 && swobUrl.indexOf("swob-realtime") >= 0, "SWOB URL host");
+
 const wcsUrl = WIND_GRID.buildWcsAaigridUrl(WIND_GRID.COVERAGE_SPEED, {
   west: -118, east: -116, south: 52, north: 54, size: 16, time: "2026-11-01T16:00:00Z",
 });
-assert(wcsUrl.indexOf("GetCoverage") >= 0 && wcsUrl.indexOf("RDPS_10km_WindSpeed_10m") >= 0, "WCS URL coverage");
+assert(wcsUrl.indexOf("GetCoverage") >= 0 && wcsUrl.indexOf("HRDPS-WEonG_2.5km_WindSpeed") >= 0, "WCS URL HRDPS coverage");
+const wcsRdps = WIND_GRID.buildWcsAaigridUrl(WIND_GRID.RDPS_SPEED, {
+  west: -118, east: -116, south: 52, north: 54, size: 16, time: "2026-11-01T16:00:00Z",
+});
+assert(wcsRdps.indexOf("RDPS_10km_WindSpeed_10m") >= 0, "WCS URL RDPS fallback coverage");
 assert(wcsUrl.indexOf("image%2Fx-aaigrid") >= 0 || wcsUrl.indexOf("image/x-aaigrid") >= 0, "WCS AAIGRID format");
 assert(typeof WIND_PARTICLES.createParticleField === "function", "WIND_PARTICLES exported");
 assert(/rgba\(/.test(WIND_PARTICLES.colorForSpeed(3, 0.5)), "particle colour helper");
@@ -291,7 +362,12 @@ assert(indexHtmlMap.indexOf("WINDSPEEDKMH") < 0, "no WINDSPEEDKMH in page");
 assert(indexHtmlMap.indexOf("WDIR6") < 0 && indexHtmlMap.indexOf("HRDPS-WEonG_2.5km_WindDir") < 0, "no WDIR6 colour style in page");
 assert(indexHtmlMap.indexOf("bgWindCanvas") >= 0 && indexHtmlMap.indexOf("wind-grid.js") >= 0, "wind particle canvas + wind-grid");
 assert(indexHtmlMap.indexOf("wind-particles.js") >= 0, "wind-particles script");
-assert(indexHtmlMap.indexOf("Wind particles (ECCC RDPS forecast)") >= 0, "wind toggle labeled particles");
+assert(indexHtmlMap.indexOf("Wind particles (ECCC HRDPS/RDPS forecast)") >= 0, "wind toggle labeled HRDPS/RDPS");
+assert(indexHtmlMap.indexOf("togStations") >= 0 && indexHtmlMap.indexOf("wind-stations.js") >= 0, "SWOB stations toggle + script");
+assert(indexHtmlMap.indexOf("api.weather.gc.ca") >= 0, "CSP/connect allows SWOB host");
+assert(fs.existsSync(path.join(root, "WIND-SOURCES.md")), "WIND-SOURCES.md present");
+assert(/HRDPS/i.test(fs.readFileSync(path.join(root, "WIND-SOURCES.md"), "utf8")), "WIND-SOURCES recommends HRDPS");
+assert(/Open-Meteo/i.test(fs.readFileSync(path.join(root, "WIND-SOURCES.md"), "utf8")) && /REJECT/i.test(fs.readFileSync(path.join(root, "WIND-SOURCES.md"), "utf8")), "WIND-SOURCES rejects Open-Meteo free");
 assert(indexHtmlMap.indexOf("windForecast") >= 0, "forecast slider present");
 assert(indexHtmlMap.indexOf("bgWindDir") < 0 && indexHtmlMap.indexOf("WINDARROWKMH") < 0, "legacy WMS arrow img removed");
 assert(indexHtmlMap.indexOf("buildEcccWindDirUrl") < 0, "page does not call WMS arrow builder");

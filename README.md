@@ -29,7 +29,8 @@ Full-page **Google Maps** hybrid basemap behind the transparent radar (Maps Java
 | Layer | Source | Id / notes | Default |
 |-------|--------|------------|---------|
 | Basemap | Google Maps JS API | `hybrid` (satellite + labels) | on |
-| Wind particles (forecast) | ECCC MSC GeoMet **WCS** AAIGRID | `RDPS_10km_WindSpeed_10m` + `RDPS_10km_WindDir_10m` → UV grid; canvas streamlines (`wind-grid.js` / `wind-particles.js`); forecast slider now…+48 h | on (toggle) |
+| Wind particles (forecast) | ECCC MSC GeoMet **WCS** AAIGRID | **HRDPS-WEonG 2.5 km** primary + **RDPS 10 km** fallback → UV grid (`wind-grid.js` / `wind-particles.js`); slider now…+48 h | on (toggle) |
+| Station winds (obs) | ECCC SWOB OGC API | `api.weather.gc.ca/collections/swob-realtime` (`wind-stations.js`); directional markers | on (toggle) |
 | Smoke | NASA GIBS WMS | `OMPS_Aerosol_Index` | off (toggle) |
 
 - Google’s logo and map-data attribution render on the map itself (required).
@@ -63,6 +64,7 @@ Includes WHZ/security helpers plus **AAIGRID parse**, **speed/dir → UV**, and 
 
 ## Docs
 
+- `WIND-SOURCES.md` — free wind source comparison + recommendation (BC/AB)  
 - `DESIGN.md` — nine agent functions  
 - `REVIEW.md` — SOC 2 / Smart Lodge QA review summary  
 

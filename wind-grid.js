@@ -1,16 +1,39 @@
 /**
- * ECCC MSC GeoMet RDPS wind grid fetch + parse (WCS AAIGRID).
- * Primary source for forecast wind particles. No Windy / unofficial APIs.
- * NASA POWER was researched: CORS-friendly but not a forecast product (future hours = -999);
- * GEOS-FP has no browser CORS API — NASA is not used for the particle field.
+ * ECCC MSC GeoMet wind grid fetch + parse (WCS AAIGRID).
+ * Primary: HRDPS-WEonG 2.5 km; fallback: RDPS 10 km (see WIND-SOURCES.md).
+ * No Windy / Open-Meteo free (non-commercial) / unofficial APIs.
+ * NASA POWER/GEOS-FP not used for forecast particles.
  */
 (function (g) {
   "use strict";
 
   var ECCC_WCS = "https://geo.weather.gc.ca/geomet";
-  var COVERAGE_SPEED = "RDPS_10km_WindSpeed_10m";
-  var COVERAGE_DIR = "RDPS_10km_WindDir_10m";
+  /** Primary (higher res over BC/AB). */
+  var HRDPS_SPEED = "HRDPS-WEonG_2.5km_WindSpeed";
+  var HRDPS_DIR = "HRDPS-WEonG_2.5km_WindDir";
+  /** Fallback / longer TIME axis. */
+  var RDPS_SPEED = "RDPS_10km_WindSpeed_10m";
+  var RDPS_DIR = "RDPS_10km_WindDir_10m";
+  /** Legacy aliases used by older callers/tests. */
+  var COVERAGE_SPEED = HRDPS_SPEED;
+  var COVERAGE_DIR = HRDPS_DIR;
+  var COVERAGE_ALLOWLIST = [
+    HRDPS_SPEED,
+    HRDPS_DIR,
+    RDPS_SPEED,
+    RDPS_DIR,
+  ];
+  var MAX_AAIGRID_BYTES = 2 * 1024 * 1024;
+  var MAX_TIME_STEPS = 500;
   var ISO_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+  function isAllowedCoverageId(id) {
+    var s = String(id || "");
+    for (var i = 0; i < COVERAGE_ALLOWLIST.length; i++) {
+      if (COVERAGE_ALLOWLIST[i] === s) return true;
+    }
+    return false;
+  }
 
   function isFiniteNumber(n) {
     return typeof n === "number" && Number.isFinite(n);
@@ -254,14 +277,20 @@
       if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return [];
       var stepMs = 60 * 60 * 1000;
       if (bits[2]) {
-        var sm = /^PT(\d+)H$/i.exec(bits[2]);
-        if (sm) stepMs = parseInt(sm[1], 10) * 3600 * 1000;
+        var sm = /^PT(\d+)H$/i.exec(String(bits[2]).trim());
+        if (!sm) return []; // unparseable period (SOC 2 B1)
+        stepMs = parseInt(sm[1], 10) * 3600 * 1000;
       }
+      // Reject zero / sub-hourly / NaN steps — prevents infinite loop (SOC 2 B1).
+      if (!Number.isFinite(stepMs) || stepMs < 3600000) return [];
       var fromMs = def ? Date.parse(def) : startMs;
       if (!Number.isFinite(fromMs)) fromMs = startMs;
       var toMs = fromMs + maxH * 3600 * 1000;
       if (toMs > endMs) toMs = endMs;
+      var steps = 0;
       for (var t = fromMs; t <= toMs + 1; t += stepMs) {
+        steps += 1;
+        if (steps > MAX_TIME_STEPS) break;
         if (t < startMs) continue;
         var iso = new Date(t).toISOString().replace(/\.\d{3}Z$/, "Z");
         if (validateIsoTime(iso)) out.push(iso);
@@ -310,6 +339,9 @@
   }
 
   function buildWcsAaigridUrl(coverageId, opts) {
+    if (!isAllowedCoverageId(coverageId)) {
+      throw new Error("coverageId not allowlisted");
+    }
     var west = opts.west;
     var east = opts.east;
     var south = opts.south;
@@ -371,22 +403,20 @@
   async function fetchAaigrid(url) {
     var res = await fetch(url, { method: "GET", credentials: "omit" });
     if (!res.ok) throw new Error("WCS HTTP " + res.status);
+    var cl = res.headers && res.headers.get ? res.headers.get("content-length") : null;
+    if (cl != null && Number(cl) > MAX_AAIGRID_BYTES) {
+      throw new Error("WCS response too large");
+    }
     var text = await res.text();
-    if (!text || text.indexOf("ncols") < 0) throw new Error("WCS not AAIGRID");
+    if (!text || text.length > MAX_AAIGRID_BYTES) {
+      throw new Error("WCS response too large");
+    }
+    if (text.indexOf("ncols") < 0) throw new Error("WCS not AAIGRID");
     return parseAaigrid(text);
   }
 
-  /**
-   * Fetch RDPS WindSpeed + WindDir AAIGRID around camp and build UV grid.
-   */
-  async function fetchRdpsUvGrid(opts) {
-    var lat = opts.lat;
-    var lon = opts.lon;
-    if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) throw new Error("bad lat/lon");
-    var box = bboxAroundCamp(lat, lon, opts.radiusKm);
-    var time = validateIsoTime(opts.time);
-    var size = opts.size || 28;
-    var speedUrl = buildWcsAaigridUrl(COVERAGE_SPEED, {
+  async function fetchUvGridPair(speedId, dirId, box, time, size) {
+    var speedUrl = buildWcsAaigridUrl(speedId, {
       west: box.west,
       east: box.east,
       south: box.south,
@@ -394,7 +424,7 @@
       size: size,
       time: time,
     });
-    var dirUrl = buildWcsAaigridUrl(COVERAGE_DIR, {
+    var dirUrl = buildWcsAaigridUrl(dirId, {
       west: box.west,
       east: box.east,
       south: box.south,
@@ -406,23 +436,61 @@
     var grid = buildUvGrid(pair[0], pair[1]);
     grid.time = time;
     grid.bbox = box;
+    grid.model = speedId.indexOf("HRDPS") >= 0 ? "HRDPS-WEonG" : "RDPS";
+    grid.coverageSpeed = speedId;
+    grid.coverageDir = dirId;
     return grid;
   }
 
-  function buildWindCapabilitiesUrl() {
+  /**
+   * Fetch wind UV grid: prefer HRDPS 2.5 km, fall back to RDPS 10 km.
+   * opts.preferRdps forces RDPS (e.g. TIME beyond HRDPS axis).
+   */
+  async function fetchEcccUvGrid(opts) {
+    var lat = opts.lat;
+    var lon = opts.lon;
+    if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) throw new Error("bad lat/lon");
+    var box = bboxAroundCamp(lat, lon, opts.radiusKm);
+    var time = validateIsoTime(opts.time);
+    var size = opts.size || 28;
+    var preferRdps = !!opts.preferRdps;
+    if (!preferRdps) {
+      try {
+        return await fetchUvGridPair(HRDPS_SPEED, HRDPS_DIR, box, time, size);
+      } catch (e) {
+        /* fall through to RDPS */
+      }
+    }
+    return await fetchUvGridPair(RDPS_SPEED, RDPS_DIR, box, time, size);
+  }
+
+  /** @deprecated alias — prefer fetchEcccUvGrid */
+  async function fetchRdpsUvGrid(opts) {
+    return fetchEcccUvGrid(opts);
+  }
+
+  function buildWindCapabilitiesUrl(layer) {
     var q = new URLSearchParams({
       SERVICE: "WMS",
       VERSION: "1.3.0",
       REQUEST: "GetCapabilities",
-      LAYER: COVERAGE_SPEED,
+      LAYER: layer || HRDPS_SPEED,
     });
     return ECCC_WCS + "?" + q.toString();
   }
 
   g.WIND_GRID = {
     ECCC_WCS: ECCC_WCS,
+    HRDPS_SPEED: HRDPS_SPEED,
+    HRDPS_DIR: HRDPS_DIR,
+    RDPS_SPEED: RDPS_SPEED,
+    RDPS_DIR: RDPS_DIR,
     COVERAGE_SPEED: COVERAGE_SPEED,
     COVERAGE_DIR: COVERAGE_DIR,
+    COVERAGE_ALLOWLIST: COVERAGE_ALLOWLIST,
+    MAX_AAIGRID_BYTES: MAX_AAIGRID_BYTES,
+    MAX_TIME_STEPS: MAX_TIME_STEPS,
+    isAllowedCoverageId: isAllowedCoverageId,
     parseAaigrid: parseAaigrid,
     speedDirToUV: speedDirToUV,
     buildUvGrid: buildUvGrid,
@@ -432,6 +500,7 @@
     validateIsoTime: validateIsoTime,
     buildWcsAaigridUrl: buildWcsAaigridUrl,
     bboxAroundCamp: bboxAroundCamp,
+    fetchEcccUvGrid: fetchEcccUvGrid,
     fetchRdpsUvGrid: fetchRdpsUvGrid,
     buildWindCapabilitiesUrl: buildWindCapabilitiesUrl,
   };
