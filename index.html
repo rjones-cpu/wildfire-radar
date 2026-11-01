@@ -1044,7 +1044,9 @@
     }
     // Particles can still run over the dark fallback using equirectangular projection.
     ensureWindField();
+    syncSharedCanvasVisibility();
     if (windGrid) restartWindAnimation();
+    else if (!(elBg.togWind && elBg.togWind.checked)) stopWindKeepStations();
     ensureStationPaintLoop();
     drawFallbackStationArrows();
   }
@@ -1149,12 +1151,45 @@
     return windField;
   }
 
+  /**
+   * #bgWindCanvas hosts particles in both map modes, and SWOB arrows only when
+   * Maps is unavailable. Hide it when neither of those needs the pixels.
+   * Maps mode draws stations as Markers, so wind-off still hides this canvas.
+   */
+  function sharedWindCanvasHidden(windOn, stationsOn, mapsReady) {
+    return !windOn && (mapsReady || !stationsOn);
+  }
+
+  function fallbackStationsNeedCanvas() {
+    return !gmapReady && !!(elBg.togStations && elBg.togStations.checked);
+  }
+
+  function syncSharedCanvasVisibility() {
+    const windOn = !!(elBg.togWind && elBg.togWind.checked);
+    const stationsOn = !!(elBg.togStations && elBg.togStations.checked);
+    if (elBg.windCanvas) {
+      elBg.windCanvas.classList.toggle(
+        "is-off",
+        sharedWindCanvasHidden(windOn, stationsOn, gmapReady)
+      );
+    }
+  }
+
+  function stopWindKeepStations() {
+    syncSharedCanvasVisibility();
+    if (windField) {
+      windField.stop();
+      if (fallbackStationsNeedCanvas()) windField.resize();
+      else windField.clear();
+    }
+    if (fallbackStationsNeedCanvas()) drawFallbackStationArrows();
+  }
+
   function restartWindAnimation() {
     const f = ensureWindField();
     if (!f) return;
     if (!(elBg.togWind && elBg.togWind.checked)) {
-      f.stop();
-      f.clear();
+      stopWindKeepStations();
       return;
     }
     if (WP && WP.prefersReducedMotion()) {
@@ -1167,13 +1202,10 @@
   function applyLayerVisibility() {
     const windOn = !!(elBg.togWind && elBg.togWind.checked);
     const smokeOn = !!(elBg.togSmoke && elBg.togSmoke.checked);
-    if (elBg.windCanvas) elBg.windCanvas.classList.toggle("is-off", !windOn);
+    syncSharedCanvasVisibility();
     if (elBg.smoke) elBg.smoke.classList.toggle("is-off", !smokeOn);
     if (windOn) restartWindAnimation();
-    else if (windField) {
-      windField.stop();
-      windField.clear();
-    }
+    else stopWindKeepStations();
   }
 
   function attachMapsOverlayHelper() {
@@ -1584,7 +1616,11 @@
       windStations = list;
       syncStationMarkers();
       ensureStationPaintLoop();
-      if (!gmapReady) drawFallbackStationArrows();
+      if (!gmapReady) {
+        syncSharedCanvasVisibility();
+        if (windField && !(elBg.togWind && elBg.togWind.checked)) windField.resize();
+        drawFallbackStationArrows();
+      }
       if (elBg.windStatus && !elBg.windStatus.classList.contains("err")) {
         const base = elBg.windStatus.textContent || "";
         if (base.indexOf("SWOB") < 0) {
@@ -1687,6 +1723,7 @@
       if (elBg.fallback) elBg.fallback.classList.remove("show");
       restoreRealBasemapCredit();
       clearStationPaintLoop();
+      if (!(elBg.togWind && elBg.togWind.checked)) stopWindKeepStations();
       syncGoogleMarkers();
       attachMapsOverlayHelper();
     } catch (err) {
@@ -1771,10 +1808,14 @@
   if (elBg.togSmoke) elBg.togSmoke.addEventListener("change", applyLayerVisibility);
   if (elBg.togStations) {
     elBg.togStations.addEventListener("change", function () {
-      if (elBg.togStations.checked) loadWindStations(camp.lat, camp.lon);
-      else {
+      if (elBg.togStations.checked) {
+        syncSharedCanvasVisibility();
+        loadWindStations(camp.lat, camp.lon);
+      } else {
         windStations = [];
         clearStationMarkers();
+        if (!(elBg.togWind && elBg.togWind.checked)) stopWindKeepStations();
+        else syncSharedCanvasVisibility();
       }
     });
   }

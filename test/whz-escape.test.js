@@ -396,6 +396,34 @@ assert(indexHtmlMap.indexOf("buildEcccWindDirUrl") < 0, "page does not call WMS 
 assert(indexHtmlMap.indexOf("scale: 10") >= 0, "fire markers enlarged (scale 10)");
 assert(/<input type="checkbox" id="togSmoke"[^>]*>/.test(indexHtmlMap) && !/<input type="checkbox" id="togSmoke"[^>]*\bchecked\b/.test(indexHtmlMap), "smoke off by default");
 assert(/<input type="checkbox" id="togWind"[^>]*\bchecked\b/.test(indexHtmlMap), "wind direction on by default");
+
+// Wind toggle must not hide SWOB arrows drawn on #bgWindCanvas in fallback mode.
+assert(
+  !/windCanvas\.classList\.toggle\("is-off", !windOn\)/.test(indexHtmlMap),
+  "wind-off does not hide the shared canvas by itself"
+);
+assert(indexHtmlMap.indexOf("function sharedWindCanvasHidden(") >= 0, "shared canvas visibility helper");
+assert(indexHtmlMap.indexOf("function stopWindKeepStations(") >= 0, "wind-off keeps fallback station arrows");
+assert(
+  /if \(windOn\) restartWindAnimation\(\);\s*else stopWindKeepStations\(\);/.test(indexHtmlMap),
+  "applyLayerVisibility wind-off repaints fallback stations"
+);
+const hiddenFn = indexHtmlMap.match(
+  /function sharedWindCanvasHidden\(windOn, stationsOn, mapsReady\) \{\s*return [^;]+;\s*\}/
+);
+assert(hiddenFn, "sharedWindCanvasHidden body extractable");
+if (hiddenFn) {
+  const visSandbox = {};
+  vm.createContext(visSandbox);
+  vm.runInContext(hiddenFn[0] + "\nthis.sharedWindCanvasHidden = sharedWindCanvasHidden;", visSandbox);
+  const hidden = visSandbox.sharedWindCanvasHidden;
+  assert(hidden(false, true, false) === false, "fallback: wind off + stations on keeps canvas");
+  assert(hidden(false, false, false) === true, "fallback: wind off + stations off hides canvas");
+  assert(hidden(false, true, true) === true, "maps: wind off hides particle canvas (stations are markers)");
+  assert(hidden(false, false, true) === true, "maps: wind off + stations off hides canvas");
+  assert(hidden(true, true, false) === false, "fallback: wind on keeps canvas");
+  assert(hidden(true, false, true) === false, "maps: wind on keeps canvas");
+}
 assert(indexHtmlMap.indexOf("maps-config.js") >= 0, "maps-config script included");
 assert(indexHtmlMap.indexOf("loading=async") >= 0, "Maps JS loading=async");
 assert(indexHtmlMap.indexOf("gm_authFailure") >= 0 && indexHtmlMap.indexOf("mapFallback") >= 0, "Maps auth failure + fallback UI");
