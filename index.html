@@ -167,25 +167,6 @@
       color: var(--muted);
       margin-bottom: 4px;
     }
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    input[type="text"], input[type="number"] {
-      width: 100%;
-      padding: 8px 10px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--input-bg);
-      color: var(--text);
-      font-size: 0.9rem;
-    }
-    input:focus {
-      outline: 2px solid var(--green-dim);
-      border-color: var(--green);
-    }
     .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
     button {
       cursor: pointer;
@@ -377,101 +358,6 @@
     .whz-banner .level.level3 { background:#ffe0e0; color: #a32020; border-color:#e07070; }
     .whz-banner .reason { color: var(--muted); flex: 1; min-width: 200px; }
     .whz-banner .reason strong { color: var(--text); }
-    .tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 12px;
-    }
-    .tabs button {
-      padding: 6px 10px;
-      font-size: 0.75rem;
-      border-radius: 999px;
-      background: #eef2f7;
-    }
-    .tabs button.active {
-      background: #15803d;
-      border-color: #166534;
-      color: #ffffff;
-      font-weight: 650;
-    }
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; }
-    .action-list, .route-steps, .contact-list, .gap-list {
-      margin: 0; padding: 0; list-style: none;
-    }
-    .action-list li, .route-steps li, .contact-list li, .gap-list li, .muster-steps li {
-      font-size: 0.82rem;
-      color: var(--text);
-      border-left: 3px solid #1a9e4a;
-      padding: 6px 10px;
-      margin-bottom: 6px;
-      background: var(--surface);
-      border-radius: 0 8px 8px 0;
-      line-height: 1.4;
-    }
-    .action-list li.active-whz { border-left-color: var(--amber); background: #fff7ed; }
-    .gap-list li { border-left-color: #c47a00; color: var(--muted); }
-    .route-card {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      margin-bottom: 10px;
-      background: var(--surface);
-    }
-    .route-card h3 {
-      margin: 0 0 6px;
-      font-size: 0.85rem;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .route-card .swatch {
-      width: 10px; height: 10px; border-radius: 50%;
-      display: inline-block;
-    }
-    .route-card .meta-line { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
-    .contact-role { font-weight: 650; color: var(--green-text); margin-bottom: 4px; }
-    .contact-duty { font-size: 0.78rem; color: var(--muted); margin-left: 8px; }
-    .plan-meta {
-      font-size: 0.75rem;
-      color: var(--muted);
-      line-height: 1.45;
-      margin-bottom: 10px;
-    }
-    .whz-all details {
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
-      margin-bottom: 8px;
-      background: var(--surface);
-    }
-    .whz-all summary {
-      cursor: pointer;
-      font-size: 0.82rem;
-      font-weight: 650;
-      color: var(--text);
-    }
-    .aq-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.75rem;
-      margin-top: 8px;
-    }
-    .aq-table th, .aq-table td {
-      border: 1px solid var(--border);
-      padding: 6px 8px;
-      text-align: left;
-      vertical-align: top;
-    }
-    .aq-table th { background: #e8eef5; color: var(--muted); font-weight: 650; }
-    main.with-prep {
-      grid-template-columns: minmax(260px, 340px) 1fr minmax(280px, 400px);
-    }
-    @media (max-width: 1100px) {
-      main.with-prep { grid-template-columns: 1fr; }
-    }
-    .prep-scroll { max-height: min(78vh, 900px); overflow: auto; }
 
 
     .src-badge {
@@ -505,8 +391,7 @@
   
   <div id="whzBanner" class="whz-banner" role="status" aria-live="polite">
     <span class="level none" id="whzLevelBadge">WHZ —</span>
-    <span class="reason" id="whzReason">Loading plan…</span>
-    <span class="meta" style="font-size:0.75rem">Plan: <strong id="planSiteLabel">—</strong></span>
+    <span class="reason" id="whzReason">Computing WHZ…</span>
   </div>
 
   <header>
@@ -518,38 +403,18 @@
     </div>
   </header>
 
-  <main class="with-prep">
+  <main>
     <aside>
       <div class="panel">
-        <h2>Camp location</h2>
-        <label for="campName">Name</label>
-        <input id="campName" type="text" value="TEST pin — just outside Hinton, AB (not a real camp)" />
-        <div class="row" style="margin-top:10px">
-          <div>
-            <label for="lat">Latitude</label>
-            <input id="lat" type="number" step="any" value="53.42" />
-          </div>
-          <div>
-            <label for="lon">Longitude</label>
-            <input id="lon" type="number" step="any" value="-117.50" />
-          </div>
-        </div>
+        <h2>Fires within 150 km</h2>
         <div class="btn-row">
-          <button class="primary" id="btnApply" type="button">Pin camp</button>
-          <button id="btnReset" type="button">Reset TEST pin</button>
-          <button id="btnLiveExample" type="button">Live example</button>
           <button id="btnRefresh" type="button">Refresh now</button>
         </div>
-        <p class="hint">
-          Default pin is a <strong>TEST location</strong> just outside Hinton, AB (53.42, −117.50) — <strong>not</strong> a real LodgeX camp. Real camp coordinates remain a plan gap.
-          <strong>Live example</strong> pins a clearly labelled EXAMPLE camp ~35 km from a current active fire (live AB/BC feed; prefers BC Out of Control / Being Held).
-          URL params: <code>?lat=&amp;lon=&amp;name=</code> (validated) or <code>?example=1</code>. Click the radar to move the pin, or enter coordinates.
-        </p>
         <div id="fetchStatus" class="status-line">Loading…</div>
-      </div>
-
-      <div class="panel" style="margin-top:16px">
-        <h2>Fires within 150 km</h2>
+        <p class="hint">
+          Camp pin defaults to a <strong>TEST location</strong> just outside Hinton, AB (53.42, −117.50) — not a real LodgeX camp.
+          Set <code>?lat=&amp;lon=&amp;name=</code> (validated) or <code>?example=1</code>, or click the radar to move the pin.
+        </p>
         <ul class="fire-list" id="fireList"></ul>
         <div class="empty" id="emptyMsg" style="display:none">No active wildfires within 150 km</div>
       </div>
@@ -572,67 +437,6 @@
       </div>
     </section>
 
-    <aside class="panel prep-scroll" id="prepPanel">
-      <h2>Site wildfire plan</h2>
-      <div class="plan-meta" id="planMeta"></div>
-      <div class="tabs" id="prepTabs" role="tablist">
-        <button type="button" class="active" data-tab="trigger" role="tab">Trigger &amp; actions</button>
-        <button type="button" data-tab="routes" role="tab">Routes &amp; muster</button>
-        <button type="button" data-tab="contacts" role="tab">Contacts</button>
-        <button type="button" data-tab="air" role="tab">Air quality</button>
-        <button type="button" data-tab="gaps" role="tab">Plan gaps</button>
-      </div>
-
-      <div class="tab-pane active" id="tab-trigger" role="tabpanel">
-        <h2 style="margin-top:4px">Active trigger (from nearest fire)</h2>
-        <p class="hint" id="activeTriggerSummary" style="margin-top:0"></p>
-        <ul class="action-list" id="activeActions"></ul>
-        <h2>All WHZ levels (from plan chart)</h2>
-        <div class="whz-all" id="allWhz"></div>
-        <h2>Recommended site resources</h2>
-        <ul class="action-list" id="resourceList"></ul>
-      </div>
-
-      <div class="tab-pane" id="tab-routes" role="tabpanel">
-        <h2>Muster / assembly</h2>
-        <div id="musterBlock"></div>
-        <h2>Evacuation routes</h2>
-        <div id="routesBlock"></div>
-        <h2>Off-site centres</h2>
-        <ul class="action-list" id="centresList"></ul>
-      </div>
-
-      <div class="tab-pane" id="tab-contacts" role="tabpanel">
-        <h2>Emergency</h2>
-        <ul class="contact-list" id="emergencyContacts"></ul>
-        <h2>Roles &amp; responsibilities</h2>
-        <ul class="contact-list" id="roleContacts"></ul>
-        <h2>Wildfire response chart (ICS roles)</h2>
-        <p class="hint" style="margin-top:0">Verbatim duties from the site plan response chart. Named people / phone numbers are blank in the source — not invented.</p>
-        <ul class="contact-list" id="responseChartRoles"></ul>
-        <h2>Radio channels</h2>
-        <ul class="action-list" id="radioList"></ul>
-        <h2>Named teams (as in plan)</h2>
-        <ul class="gap-list" id="namedTeams"></ul>
-        <h2>Forestry form fields</h2>
-        <ul class="gap-list" id="forestryFields"></ul>
-      </div>
-
-      <div class="tab-pane" id="tab-air" role="tabpanel">
-        <p class="hint" id="aqNote"></p>
-        <table class="aq-table" id="aqVisibility"><thead></thead><tbody></tbody></table>
-        <h2 style="margin-top:14px">Recommended wildfire air quality response</h2>
-        <div id="aqActions"></div>
-        <h2>Carbon monoxide</h2>
-        <p class="hint" id="coNote"></p>
-      </div>
-
-      <div class="tab-pane" id="tab-gaps" role="tabpanel">
-        <p class="hint">Only content present in the site plan is shown elsewhere. Items below are missing or non-extractable — not invented.</p>
-        <ul class="gap-list" id="gapsList"></ul>
-      </div>
-    </aside>
-
   </main>
 
   <footer>
@@ -644,7 +448,7 @@
     (<a href="https://geo.weather.gc.ca/geomet" target="_blank" rel="noopener">MSC GeoMet</a>; commercial use permitted; no bulk tile scraping; contact if ≥86,400 req/day)
     · Imagery from NASA’s <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs" target="_blank" rel="noopener">Global Imagery Browse Services (GIBS)</a>, part of NASA’s Earth Science Data and Information System (ESDIS).
     We acknowledge the use of imagery provided by services from NASA’s GIBS. This product is not endorsed by NASA.
-    · Prototype / local only · Plan embedded from site-specific doc · Fire feeds refresh 5 min · Map layers 30 min
+    · Prototype / local only · WHZ thresholds from site plan extract (`plan-data.js`) · Fire feeds refresh 5 min · Map layers 30 min
   </footer>
 
   <script src="radar-security.js"></script>
@@ -673,9 +477,6 @@
   const canvas = document.getElementById("radar");
   const ctx = canvas.getContext("2d");
   const el = {
-    campName: document.getElementById("campName"),
-    lat: document.getElementById("lat"),
-    lon: document.getElementById("lon"),
     campLabel: document.getElementById("campLabel"),
     fireList: document.getElementById("fireList"),
     emptyMsg: document.getElementById("emptyMsg"),
@@ -688,26 +489,6 @@
     modeBadge: document.getElementById("modeBadge"),
     whzLevelBadge: document.getElementById("whzLevelBadge"),
     whzReason: document.getElementById("whzReason"),
-    planSiteLabel: document.getElementById("planSiteLabel"),
-    planMeta: document.getElementById("planMeta"),
-    activeTriggerSummary: document.getElementById("activeTriggerSummary"),
-    activeActions: document.getElementById("activeActions"),
-    allWhz: document.getElementById("allWhz"),
-    resourceList: document.getElementById("resourceList"),
-    musterBlock: document.getElementById("musterBlock"),
-    routesBlock: document.getElementById("routesBlock"),
-    centresList: document.getElementById("centresList"),
-    emergencyContacts: document.getElementById("emergencyContacts"),
-    roleContacts: document.getElementById("roleContacts"),
-    responseChartRoles: document.getElementById("responseChartRoles"),
-    radioList: document.getElementById("radioList"),
-    namedTeams: document.getElementById("namedTeams"),
-    forestryFields: document.getElementById("forestryFields"),
-    aqNote: document.getElementById("aqNote"),
-    aqVisibility: document.getElementById("aqVisibility"),
-    aqActions: document.getElementById("aqActions"),
-    coNote: document.getElementById("coNote"),
-    gapsList: document.getElementById("gapsList"),
   };
 
   let camp = { ...DEFAULT };
@@ -827,88 +608,11 @@
     console.error("plan-data.js missing");
   }
 
-  function renderPlanStatic() {
-    if (!PLAN) return;
-    el.planSiteLabel.textContent = PLAN.meta.site;
-    el.planMeta.innerHTML =
-      "<strong>" + escapeHtml(PLAN.meta.title) + "</strong><br/>" +
-      "Site: " + escapeHtml(PLAN.meta.site) + "<br/>" +
-      "Document: " + escapeHtml(PLAN.meta.documentDateLabel) + "<br/>" +
-      "Report wildfire: <strong>" + escapeHtml(PLAN.meta.reportWildfire) + "</strong>";
-
-    el.allWhz.innerHTML = "";
-    PLAN.whzLevels.slice().sort((a,b) => b.severity - a.severity).forEach((lvl) => {
-      const d = document.createElement("details");
-      d.innerHTML =
-        "<summary>" + escapeHtml(lvl.name) + " — " + escapeHtml(lvl.rangeLabel) + "</summary>" +
-        "<ul class='action-list'>" +
-        lvl.actions.map((a) => "<li>" + escapeHtml(a) + "</li>").join("") +
-        "</ul>";
-      el.allWhz.appendChild(d);
-    });
-
-    el.resourceList.innerHTML = PLAN.resourceList.map((r) => "<li>" + escapeHtml(r) + "</li>").join("");
-
-    el.musterBlock.innerHTML = PLAN.musterPoints.map((m) =>
-      "<div class='route-card'><h3>" + escapeHtml(m.name) + "</h3>" +
-      "<p class='meta-line'>" + escapeHtml(m.detail) + "</p>" +
-      "<ul class='action-list'>" + m.steps.map((s) => "<li>" + escapeHtml(s) + "</li>").join("") + "</ul></div>"
-    ).join("");
-
-    el.routesBlock.innerHTML = PLAN.evacuationRoutes.map((r) =>
-      "<div class='route-card'><h3><span class='swatch' style='background:" + safeRouteColor(r.color) + "'></span>" +
-      escapeHtml(r.name) + "</h3>" +
-      "<div class='meta-line'>Destination: " + escapeHtml(r.destination) +
-      " · Radio: " + escapeHtml(r.radio) + "</div>" +
-      "<ul class='action-list'>" + r.steps.map((s) => "<li>" + escapeHtml(s) + "</li>").join("") + "</ul></div>"
-    ).join("");
-
-    el.centresList.innerHTML = PLAN.offSiteCentres.map((c) => "<li>" + escapeHtml(c) + "</li>").join("");
-
-    el.emergencyContacts.innerHTML = PLAN.contacts.emergencyReport.map((c) =>
-      "<li><div class='contact-role'>" + escapeHtml(c.role) + "</div><div class='contact-duty'>" + escapeHtml(c.detail) + "</div></li>"
-    ).join("");
-
-    el.roleContacts.innerHTML = PLAN.contacts.roles.map((c) =>
-      "<li><div class='contact-role'>" + escapeHtml(c.role) + "</div>" +
-      c.duties.map((d) => "<div class='contact-duty'>• " + escapeHtml(d) + "</div>").join("") +
-      "</li>"
-    ).join("");
-
-    const chartRoles = (PLAN.contacts.responseChartRoles || []);
-    el.responseChartRoles.innerHTML = chartRoles.map((c) =>
-      "<li><div class='contact-role'>" + escapeHtml(c.role) + "</div>" +
-      c.duties.map((d) => "<div class='contact-duty'>• " + escapeHtml(d) + "</div>").join("") +
-      "</li>"
-    ).join("");
-
-    el.radioList.innerHTML = PLAN.contacts.radioChannels.map((r) =>
-      "<li><strong>" + escapeHtml(r.channel) + "</strong> — " + escapeHtml(r.use) + "</li>"
-    ).join("");
-
-    el.namedTeams.innerHTML = PLAN.contacts.namedTeams.map((t) => "<li>" + escapeHtml(t) + "</li>").join("");
-    el.forestryFields.innerHTML = PLAN.contacts.forestryFormFields.map((t) => "<li>" + escapeHtml(t) + "</li>").join("");
-
-    el.aqNote.textContent = PLAN.airQuality.note;
-    const thead = el.aqVisibility.querySelector("thead");
-    const tbody = el.aqVisibility.querySelector("tbody");
-    thead.innerHTML = "<tr><th>Visibility</th><th>Category</th><th>Approx. PM2.5 (µg/m³)</th></tr>";
-    tbody.innerHTML = PLAN.airQuality.visibilityTable.map((r) =>
-      "<tr><td>" + escapeHtml(r.visibilityKm) + "</td><td>" + escapeHtml(r.category) +
-      "</td><td>" + escapeHtml(r.pm25) + "</td></tr>"
-    ).join("");
-
-    el.aqActions.innerHTML = PLAN.airQuality.responseActions.map((r) =>
-      "<details class='whz-all'><summary>" + escapeHtml(r.category) + "</summary>" +
-      "<p class='hint'><strong>At risk:</strong> " + escapeHtml(r.atRisk) + "<br/>" +
-      "<strong>Others:</strong> " + escapeHtml(r.others) + "</p>" +
-      "<ul class='action-list'>" + r.actions.map((a) => "<li>" + escapeHtml(a) + "</li>").join("") +
-      "</ul></details>"
-    ).join("");
-
-    el.coNote.textContent = PLAN.airQuality.carbonMonoxide.note;
-    el.gapsList.innerHTML = PLAN.gaps.map((g) => "<li>" + escapeHtml(g) + "</li>").join("");
+  const escapeHtml = window.escapeHtml;
+  if (typeof escapeHtml !== "function") {
+    console.error("radar-security.js missing");
   }
+  // Fire-list status uses statusTextColor (panel text); radar markers use statusColor (graphics).
 
   function updateWhzUi() {
     if (!PLAN || !window.computeWhzLevel) return;
@@ -919,8 +623,6 @@
     if (!result.level) {
       badge.textContent = "WHZ — CLEAR / OUTSIDE TRIGGERS";
       el.whzReason.innerHTML = escapeHtml(result.reason);
-      el.activeTriggerSummary.textContent = result.reason;
-      el.activeActions.innerHTML = "<li>No distance-triggered WHZ actions active. Continue Fire Watch per site practice.</li>";
     } else {
       const id = result.level.id;
       badge.className = "level " + (id === "alert" ? "alert" : id);
@@ -929,37 +631,19 @@
       el.whzReason.innerHTML =
         escapeHtml(result.reason) +
         " · Driving fire: <strong>" + escapeHtml(fireLabel) + "</strong>";
-      el.activeTriggerSummary.textContent =
-        result.reason + " · Driving fire: " + fireLabel +
-        " · Route decision remains with Incident Commander (TCE Site Construction Manager).";
-      el.activeActions.innerHTML = result.level.actions
-        .map((a) => "<li class='active-whz'>" + escapeHtml(a) + "</li>")
-        .join("");
     }
   }
 
-  // Tabs
-  document.querySelectorAll("#prepTabs button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll("#prepTabs button").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-pane").forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      const pane = document.getElementById("tab-" + btn.dataset.tab);
-      if (pane) pane.classList.add("active");
-    });
-  });
-
-  function applyCampFromInputs() {
-    const coords = window.validateCampCoords(el.lat.value, el.lon.value);
+    function setCamp(name, lat, lon) {
+    const coords = window.validateCampCoords(lat, lon);
     if (!coords.ok) {
       el.fetchStatus.textContent = coords.error || "Invalid lat/lon";
       el.fetchStatus.className = "status-line err";
       return false;
     }
-    const name = window.sanitizeCampName(el.campName.value, DEFAULT.name);
-    el.campName.value = name;
-    camp = { name, lat: coords.lat, lon: coords.lon };
-    el.campLabel.textContent = name;
+    const safeName = window.sanitizeCampName(name, DEFAULT.name);
+    camp = { name: safeName, lat: coords.lat, lon: coords.lon };
+    el.campLabel.textContent = safeName;
     updateBackgroundMap(coords.lat, coords.lon);
     recomputeNear();
     renderList();
@@ -1054,10 +738,7 @@
       (fire.FIRE_NUMBER || fire.LABEL || fire.INCIDENT_NAME || "fire") +
       " · not a real LodgeX camp";
     const name = window.sanitizeCampName(label, "EXAMPLE camp (live)");
-    el.campName.value = name;
-    el.lat.value = bestPin.lat.toFixed(5);
-    el.lon.value = bestPin.lon.toFixed(5);
-    if (!applyCampFromInputs()) return { ok: false, error: "apply failed" };
+    if (!setCamp(name, bestPin.lat, bestPin.lon)) return { ok: false, error: "apply failed" };
     const whz = window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM);
     const dist = near.length ? near[0].dist : null;
     el.fetchStatus.textContent =
@@ -1205,12 +886,6 @@
     });
   }
 
-  const escapeHtml = window.escapeHtml;
-  const safeRouteColor = window.safeRouteColor;
-  if (typeof escapeHtml !== "function" || typeof safeRouteColor !== "function") {
-    console.error("radar-security.js missing");
-  }
-  // Fire-list status uses statusTextColor (panel text); radar markers use statusColor (graphics).
 
   function coordsFromFeature(ft, p) {
     let lat = p.LATITUDE;
@@ -1511,54 +1186,20 @@
     if (brg < 0) brg += 360;
     const dest = destination(camp.lat, camp.lon, distKm, brg);
     // Click moves the *camp* to that geographic point (re-center radar)
-    el.lat.value = dest.lat.toFixed(5);
-    el.lon.value = dest.lon.toFixed(5);
-    if (!el.campName.value.includes("placeholder") && el.campName.value === DEFAULT.name) {
-      /* keep */
-    }
-    applyCampFromInputs();
+    setCamp(camp.name, dest.lat, dest.lon);
     el.fetchStatus.textContent = "Camp pin moved via radar click · " + dest.lat.toFixed(5) + ", " + dest.lon.toFixed(5);
     el.fetchStatus.className = "status-line ok";
   });
 
-  document.getElementById("btnApply").addEventListener("click", () => {
-    if (applyCampFromInputs()) {
-      el.fetchStatus.textContent = "Camp pinned · " + camp.lat.toFixed(5) + ", " + camp.lon.toFixed(5);
-      el.fetchStatus.className = "status-line ok";
-    }
-  });
-  document.getElementById("btnReset").addEventListener("click", () => {
-    el.campName.value = DEFAULT.name;
-    el.lat.value = String(DEFAULT.lat);
-    el.lon.value = String(DEFAULT.lon);
-    applyCampFromInputs();
-  });
   document.getElementById("btnRefresh").addEventListener("click", () => fetchFires());
-  document.getElementById("btnLiveExample").addEventListener("click", async () => {
-    el.fetchStatus.textContent = "Loading live feeds for EXAMPLE pin…";
-    el.fetchStatus.className = "status-line";
-    await fetchFires();
-    if (TEST_MODE) {
-      el.fetchStatus.textContent = "Live example needs live feeds — open without ?test=1";
-      el.fetchStatus.className = "status-line err";
-      return;
-    }
-    applyLiveExampleFromFeed(fires);
-  });
 
   // init — optional ?lat=&lon=&name= (validated); default remains Hinton TEST pin
-  renderPlanStatic();
   const fromQuery = window.parseCampQueryParams(params, "Camp from URL");
   if (fromQuery.ok) {
-    el.campName.value = fromQuery.name;
-    el.lat.value = String(fromQuery.lat);
-    el.lon.value = String(fromQuery.lon);
+    setCamp(fromQuery.name, fromQuery.lat, fromQuery.lon);
   } else {
-    el.campName.value = DEFAULT.name;
-    el.lat.value = String(DEFAULT.lat);
-    el.lon.value = String(DEFAULT.lon);
+    setCamp(DEFAULT.name, DEFAULT.lat, DEFAULT.lon);
   }
-  applyCampFromInputs();
   fetchFires();
   setInterval(fetchFires, REFRESH_MS);
   if (ML) setInterval(() => updateBackgroundMap(camp.lat, camp.lon), ML.MAP_REFRESH_MS);

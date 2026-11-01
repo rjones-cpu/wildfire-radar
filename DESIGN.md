@@ -6,7 +6,7 @@ Add-on for LodgeX **Smart Lodge** and **CrewSight (Major Projects)**. Prototype 
 
 **Role:** Site wildfire preparedness co-pilot for camp / project operations (lodge ops and major-projects crews).
 
-**Goal:** Given a camp pin and live AB + BC active-wildfire feeds, surface the **site plan’s** WHZ level, actions, contacts (including ICS response-chart role duties), muster points, and evacuation routes so humans can act faster — without inventing plan content or issuing an evacuation order (that remains the TCE Incident Commander).
+**Goal:** Given a camp pin and live AB + BC active-wildfire feeds, surface the **WHZ level** (from the site plan distance chart) on the radar so humans can see hazard proximity faster — without inventing plan content or issuing an evacuation order (that remains the TCE Incident Commander). Full plan actions / routes / contacts are kept in `plan-data.js` but are **not** shown in the current UI (camp-location widget and site-plan panel removed per Ralph, 2026-10-31).
 
 ## 2. Knowledge
 
@@ -25,7 +25,7 @@ Add-on for LodgeX **Smart Lodge** and **CrewSight (Major Projects)**. Prototype 
 | `computeWhzLevel(nearestKm)` | Map distance → Alert / L1 / L2 / L3 per plan chart |
 | ECCC MSC GeoMet WMS (`geo.weather.gc.ca/geomet`) | HRDPS-WEonG wind speed + WindDir GetMap images; recenters with camp |
 | NASA GIBS WMS (`gibs.earthdata.nasa.gov`) | MODIS Terra corrected reflectance basemap + OMPS aerosol index smoke overlay |
-| Local UI panels | Display actions, routes, contacts (incl. response chart), AQ, gaps |
+| Local UI panels | WHZ banner, fires-within-150 km list, radar; plan detail panels removed from UI |
 | `?test=1` | Offline sample fires for demos/tests (not live feeds) |
 
 No write tools, no SMS/email send. Map imagery: ECCC GeoMet + NASA GIBS only (no third-party wind embed). Light map refresh (30 min) to respect ECCC usage policy (no bulk scraping; contact if ≥86,400 req/day).
@@ -35,14 +35,14 @@ No write tools, no SMS/email send. Map imagery: ECCC GeoMet + NASA GIBS only (no
 1. Fetch (or load test) active fires from **both** AB and BC → filter to ≤150 km of camp.
 2. Sort by distance; nearest fire of either province drives WHZ.
 3. Thresholds from plan: ≤25 km → Level 3; ≤50 → Level 2; ≤100 → Level 1; ≤150 → Alert; else clear.
-4. Present that level’s **plan actions** and keep full chart + routes/contacts/response-chart duties available.
-5. Do not choose which coloured route to take — plan assigns route communication to the Incident Commander.
+4. Present that level on the **WHZ banner** (name + range + nearest-fire reason). Plan action lists / routes / contacts are not rendered in the current UI.
+5. Do not choose which coloured route to take — plan assigns route communication to the Incident Commander (still true when a plan panel is restored).
 
 **Feed decision (Ralph, 2026-10-31):** radar uses **both** BC and Alberta feeds (product intent).
 
 ## 5. Memory
 
-- **Session only:** camp name/lat/lon in page inputs; last fetch result in memory; hover highlight.
+- **Session only:** camp name/lat/lon in memory (from default / URL / radar click / `?example=1`); last fetch result; hover highlight. No camp-location form on the page.
 - **No persistent PII store;** no cookies of guest data; refresh reloads feeds.
 - Plan content is static ship-with-app knowledge (`plan-data.js`), versioned with the repo.
 
@@ -64,12 +64,12 @@ No write tools, no SMS/email send. Map imagery: ECCC GeoMet + NASA GIBS only (no
 | WHZ Level 1+ | Surface Contact ECC / Calgary EOC and ESRD actions from plan |
 | WHZ Level 2–3 | Emphasize evacuation / shutdown actions from plan; human IC decides |
 | One feed fetch failure | `Promise.allSettled`: keep the other feed; retain prior good data for the failed source |
-| Plan gap (missing phone) | Show gap panel; operator uses on-site posted numbers |
+| Plan gap (missing phone) | Gaps remain flagged in `plan-data.js` / DESIGN — **no Plan gaps panel in UI** after 2026-10-31 removal; operator uses on-site posted numbers |
 | Push/deploy request | Block until SOC 2 Type 2 (`09c48fca`) and Smart Lodge QA (`689bf595`) pass same commit |
 
 ## 8. Communication
 
-- UI: WHZ banner (live), trigger actions list, tabs for routes/muster, contacts (evacuation roles + ICS response chart), air quality, gaps.
+- UI: WHZ banner (live), fires list + refresh, radar; **no** camp-location widget and **no** site wildfire plan panel.
 - Radar rings at 25 / 50 / 100 / 150 km aligned to WHZ chart + monitor radius; ECCC/GIBS map under semi-transparent overlays; wind/smoke toggles + timestamp.
 - Footer cites AB + BC fire feeds; **Data Source: Environment and Climate Change Canada**; NASA GIBS acknowledgment (no NASA endorsement).
 - Human-readable MT timestamps (`America/Edmonton`).

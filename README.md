@@ -1,6 +1,6 @@
 # LodgeX Wildfire Preparedness · Radar (prototype)
 
-Static add-on for **Smart Lodge** and **CrewSight (Major Projects)**. Animated 150 km radar on a **placeholder** camp pin, with **Alberta + British Columbia** active wildfire feeds, and the **site-specific wildfire plan** embedded (WHZ distance triggers, actions, muster, evacuation routes, contacts, air-quality tables, and documented gaps).
+Static add-on for **Smart Lodge** and **CrewSight (Major Projects)**. Animated 150 km radar on a **placeholder** camp pin, with **Alberta + British Columbia** active wildfire feeds. WHZ level is computed from nearest-fire distance using thresholds in `plan-data.js`. The camp-location form and site wildfire plan side panel are **not** shown in the UI (Ralph, 2026-10-31); camp pin comes from the default TEST pin, validated `?lat=&lon=&name=`, `?example=1`, or a radar click.
 
 ## Run locally
 
@@ -38,9 +38,9 @@ Full-page map behind the transparent radar (no third-party wind embed):
 - **GIBS:** acknowledge NASA GIBS / ESDIS; no NASA endorsement implied.
 - URL builders live in `map-layers.js`.
 
-## Plan
+## Plan data (WHZ only in UI)
 
-Extracted into `plan-data.js` from `/workspace/wildfire-preparedness/site-specific-plan.docx` (+ pptx context).
+`plan-data.js` still holds the site-plan extract (WHZ chart, actions, routes, contacts, AQ, gaps) and exports `computeWhzLevel`. The live page surfaces **WHZ banner + radar rings only** — plan actions, routes, contacts, AQ tables, and the Plan gaps list are **not rendered** (no home on the page until Ralph asks to restore a panel). Documented gaps remain in `plan-data.js` / DESIGN.md.
 
 ## Tests
 

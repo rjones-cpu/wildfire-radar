@@ -211,7 +211,20 @@ assert(indexHtmlMap.indexOf("frame-src 'none'") >= 0 || indexHtmlMap.indexOf('fr
 assert(indexHtmlMap.indexOf("geo.weather.gc.ca") >= 0 && indexHtmlMap.indexOf("gibs.earthdata.nasa.gov") >= 0, "CSP/map hosts present");
 assert(indexHtmlMap.indexOf("statusTextColor(f.FIRE_STATUS)") >= 0, "fire list still statusTextColor");
 assert(indexHtmlMap.indexOf("Data Source: Environment and Climate Change Canada") >= 0, "ECCC attribution");
+
 assert(indexHtmlMap.toLowerCase().indexOf("not endorsed by nasa") >= 0, "NASA non-endorsement");
+
+// --- UI trim (Ralph): no camp-location widget / site plan panel ---
+assert(indexHtmlMap.indexOf("Camp location") < 0, "no Camp location widget heading");
+assert(indexHtmlMap.indexOf("Site wildfire plan") < 0, "no Site wildfire plan panel heading");
+assert(indexHtmlMap.indexOf("prepPanel") < 0 && indexHtmlMap.indexOf("prepTabs") < 0, "no prep panel/tabs ids");
+assert(indexHtmlMap.indexOf("id=\"campName\"") < 0 && indexHtmlMap.indexOf("id='campName'") < 0, "no campName input");
+assert(indexHtmlMap.indexOf("btnApply") < 0 && indexHtmlMap.indexOf("btnReset") < 0, "no pin/reset buttons");
+assert(indexHtmlMap.indexOf("btnRefresh") >= 0, "refresh button retained");
+assert(indexHtmlMap.indexOf("whzLevelBadge") >= 0 && indexHtmlMap.indexOf("computeWhzLevel") >= 0, "WHZ banner + compute kept");
+assert(indexHtmlMap.indexOf("function setCamp") >= 0, "setCamp present");
+assert(indexHtmlMap.indexOf("togSmoke") >= 0 && indexHtmlMap.indexOf("MAP_LAYERS") >= 0, "smoke toggle / map layers kept");
+
 
 if (failed) {
   console.error("\n" + failed + " failure(s)");

@@ -17,6 +17,10 @@
 
 ---
 
+## 1b. UI trim (Ralph — 2026-10-31)
+
+Ralph asked to **remove the camp location widget and the site wildfire plan panel**. Page keeps radar, AB+BC feeds, WHZ banner (`computeWhzLevel`), ECCC/GIBS background. Camp pin via default Hinton TEST coords, `?lat=&lon=&name=`, `?example=1`, or radar click. Plan actions / routes / contacts / AQ / gaps no longer have a home on the page (still in `plan-data.js`).
+
 ## 2. EcoSystem Team additions
 
 - **BC Wildfire Service** public active-fire feed:
