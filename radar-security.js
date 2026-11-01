@@ -29,7 +29,9 @@
   function safeRouteColor(color, fallback) {
     var fb = fallback == null ? "#4b5563" : fallback;
     var raw = String(color || "").trim().toLowerCase();
-    if (ROUTE_COLOR_ALIASES[raw]) raw = ROUTE_COLOR_ALIASES[raw];
+    if (Object.prototype.hasOwnProperty.call(ROUTE_COLOR_ALIASES, raw)) {
+      raw = ROUTE_COLOR_ALIASES[raw];
+    }
     for (var i = 0; i < ROUTE_COLOR_ALLOWLIST.length; i++) {
       if (ROUTE_COLOR_ALLOWLIST[i].toLowerCase() === raw) {
         return ROUTE_COLOR_ALLOWLIST[i];
@@ -38,11 +40,25 @@
     return fb;
   }
 
-  /** Validate camp latitude/longitude. */
+  /**
+   * Strict decimal parse for camp coords (SOC 2 B1).
+   * Rejects parseFloat footguns: '53abc', '5e1', '0x10', '53,42', etc.
+   * @returns {number|null}
+   */
+  function parseStrictDecimal(v) {
+    if (v == null) return null;
+    var s = String(v).trim();
+    if (!/^-?\d{1,3}(\.\d{1,8})?$/.test(s)) return null;
+    var n = Number(s);
+    if (!Number.isFinite(n)) return null;
+    return n;
+  }
+
+  /** Validate camp latitude/longitude (strict decimal strings / numbers). */
   function validateCampCoords(lat, lon) {
-    var la = typeof lat === "number" ? lat : parseFloat(lat);
-    var lo = typeof lon === "number" ? lon : parseFloat(lon);
-    if (!Number.isFinite(la) || !Number.isFinite(lo)) {
+    var la = parseStrictDecimal(lat);
+    var lo = parseStrictDecimal(lon);
+    if (la == null || lo == null) {
       return { ok: false, error: "Invalid lat/lon" };
     }
     if (la < -90 || la > 90 || lo < -180 || lo > 180) {
@@ -119,6 +135,7 @@
   g.escapeHtml = escapeHtml;
   g.safeRouteColor = safeRouteColor;
   g.ROUTE_COLOR_ALLOWLIST = ROUTE_COLOR_ALLOWLIST;
+  g.parseStrictDecimal = parseStrictDecimal;
   g.validateCampCoords = validateCampCoords;
   g.sanitizeCampName = sanitizeCampName;
   g.parseCampQueryParams = parseCampQueryParams;

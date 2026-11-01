@@ -29,7 +29,7 @@ vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(root, "radar-security.js"), "utf8"), sandbox);
 vm.runInContext(fs.readFileSync(path.join(root, "plan-data.js"), "utf8"), sandbox);
 
-const { escapeHtml, safeRouteColor, computeWhzLevel, WILDFIRE_PLAN, validateCampCoords, sanitizeCampName, parseCampQueryParams, pickLiveExampleFire } = sandbox;
+const { escapeHtml, safeRouteColor, computeWhzLevel, WILDFIRE_PLAN, validateCampCoords, sanitizeCampName, parseCampQueryParams, pickLiveExampleFire, parseStrictDecimal } = sandbox;
 
 assert(typeof computeWhzLevel === "function", "computeWhzLevel exported");
 assert(WILDFIRE_PLAN && WILDFIRE_PLAN.whzLevels.length === 4, "plan levels present");
@@ -76,15 +76,27 @@ assert(safeRouteColor("#000000") === "#4b5563", "reject non-allowlisted hex");
 assert(safeRouteColor("expression(alert(1))") === "#4b5563", "reject css expression");
 
 
-// --- camp URL param validation ---
+// --- camp URL param validation (SOC 2 B1 strict decimal) ---
 assert(typeof validateCampCoords === "function", "validateCampCoords exported");
+assert(typeof parseStrictDecimal === "function", "parseStrictDecimal exported");
 assert(validateCampCoords(53.42, -117.5).ok === true, "valid Hinton coords");
+assert(validateCampCoords(" 53.42 ", " -114.5 ").ok === true, "trimmed valid coords");
+assert(validateCampCoords("53.42", "-114.5").ok === true, "allow -114.5 lon");
 assert(validateCampCoords("91", "0").ok === false, "lat > 90 rejected");
 assert(validateCampCoords("-91", "0").ok === false, "lat < -90 rejected");
 assert(validateCampCoords("0", "181").ok === false, "lon > 180 rejected");
 assert(validateCampCoords("0", "-181").ok === false, "lon < -180 rejected");
 assert(validateCampCoords("abc", "1").ok === false, "non-numeric rejected");
 assert(validateCampCoords(NaN, 0).ok === false, "NaN rejected");
+// parseFloat footguns — must reject
+assert(validateCampCoords("53abc", "-117.5").ok === false, "reject 53abc");
+assert(validateCampCoords("53.42abc", "-117.5").ok === false, "reject 53.42abc");
+assert(validateCampCoords("5e1", "-117.5").ok === false, "reject 5e1");
+assert(validateCampCoords("1e3", "0").ok === false, "reject 1e3");
+assert(validateCampCoords("0x10", "0").ok === false, "reject 0x10");
+assert(validateCampCoords("53,42", "-117.5").ok === false, "reject 53,42");
+assert(parseStrictDecimal("53abc") === null, "parseStrictDecimal null for 53abc");
+assert(parseStrictDecimal(" 53.42 ") === 53.42, "parseStrictDecimal trims");
 
 assert(sanitizeCampName('<script>x</script>') === "scriptx/script", "sanitize strips tags");
 assert(sanitizeCampName('  a   b  ') === "a b", "sanitize collapses space");
