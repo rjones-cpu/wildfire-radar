@@ -223,7 +223,44 @@ assert(indexHtmlMap.indexOf("btnApply") < 0 && indexHtmlMap.indexOf("btnReset") 
 assert(indexHtmlMap.indexOf("btnRefresh") >= 0, "refresh button retained");
 assert(indexHtmlMap.indexOf("whzLevelBadge") >= 0 && indexHtmlMap.indexOf("computeWhzLevel") >= 0, "WHZ banner + compute kept");
 assert(indexHtmlMap.indexOf("function setCamp") >= 0, "setCamp present");
+
 assert(indexHtmlMap.indexOf("togSmoke") >= 0 && indexHtmlMap.indexOf("MAP_LAYERS") >= 0, "smoke toggle / map layers kept");
+
+// --- SOC 2 B1: computed pins must toFixed(5) before setCamp (c740b3c regression) ---
+const rawFloat = 53.64198460122583; // 14 decimals — String(rawFloat) fails parseStrictDecimal
+assert(parseStrictDecimal(String(rawFloat)) === null, "raw 14-decimal float string rejected by parseStrictDecimal");
+assert(parseStrictDecimal(rawFloat) === null, "raw Number with >8 decimals rejected (String coercion)");
+const fixed5 = rawFloat.toFixed(5);
+assert(fixed5 === "53.64198", "toFixed(5) yields 53.64198");
+assert(parseStrictDecimal(fixed5) === 53.64198, "toFixed(5) accepted by parseStrictDecimal");
+assert(validateCampCoords(rawFloat.toFixed(5), (-117.50123456789012).toFixed(5)).ok === true, "setCamp/click path accepts after toFixed(5)");
+assert(validateCampCoords(rawFloat, -117.50123456789012).ok === false, "pre-toFixed float path rejected (c740b3c bug)");
+
+// junk still rejected (URL / direct input — strict regex unchanged)
+["53abc", "5e1", "0x10", "53.42abc", "1e3"].forEach((j) => {
+  assert(parseStrictDecimal(j) === null, "junk still rejected: " + j);
+  assert(validateCampCoords(j, "-117.5").ok === false, "validate rejects junk lat: " + j);
+});
+
+// index.html: computed-pin sites use toFixed(5); no ok status when setCamp fails
+assert(/setCamp\(\s*name,\s*bestPin\.lat\.toFixed\(5\),\s*bestPin\.lon\.toFixed\(5\)\s*\)/.test(indexHtmlMap), "live example setCamp uses toFixed(5)");
+assert(/setCamp\(\s*camp\.name,\s*dest\.lat\.toFixed\(5\),\s*dest\.lon\.toFixed\(5\)\s*\)/.test(indexHtmlMap), "radar click setCamp uses toFixed(5)");
+assert(!/setCamp\(\s*camp\.name,\s*dest\.lat,\s*dest\.lon\s*\)/.test(indexHtmlMap), "no raw dest.lat/lon setCamp (c740b3c)");
+assert(!/setCamp\(\s*name,\s*bestPin\.lat,\s*bestPin\.lon\s*\)/.test(indexHtmlMap), "no raw bestPin setCamp (c740b3c)");
+const clickIdx = indexHtmlMap.indexOf("Click radar");
+assert(clickIdx >= 0, "click handler present");
+const clickChunk = indexHtmlMap.slice(clickIdx, clickIdx + 2200);
+assert(/if\s*\(\s*!setCamp\(/.test(clickChunk), "click checks !setCamp before ok");
+assert(/Invalid location/.test(clickChunk), "click shows Invalid location on failure");
+const failGate = clickChunk.indexOf("if (!setCamp");
+const okStatus = clickChunk.indexOf('className = "status-line ok"');
+assert(failGate >= 0 && okStatus > failGate, "ok status only after setCamp gate (not on false return)");
+const liveIdx = indexHtmlMap.indexOf("function applyLiveExampleFromFeed");
+const liveChunk = indexHtmlMap.slice(liveIdx, liveIdx + 5000);
+assert(/if\s*\(\s*!setCamp\(/.test(liveChunk) && /Invalid location/.test(liveChunk), "live example gates setCamp + Invalid location");
+const secSrc = fs.readFileSync(path.join(root, "radar-security.js"), "utf8");
+assert(secSrc.indexOf("/^-?\\d{1,3}(\\.\\d{1,8})?$/") >= 0, "strict regex unchanged (1–8 decimals)");
+
 
 
 if (failed) {

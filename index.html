@@ -634,7 +634,7 @@
     }
   }
 
-    function setCamp(name, lat, lon) {
+  function setCamp(name, lat, lon) {
     const coords = window.validateCampCoords(lat, lon);
     if (!coords.ok) {
       el.fetchStatus.textContent = coords.error || "Invalid lat/lon";
@@ -738,7 +738,11 @@
       (fire.FIRE_NUMBER || fire.LABEL || fire.INCIDENT_NAME || "fire") +
       " · not a real LodgeX camp";
     const name = window.sanitizeCampName(label, "EXAMPLE camp (live)");
-    if (!setCamp(name, bestPin.lat, bestPin.lon)) return { ok: false, error: "apply failed" };
+    if (!setCamp(name, bestPin.lat.toFixed(5), bestPin.lon.toFixed(5))) {
+      el.fetchStatus.textContent = "Invalid location";
+      el.fetchStatus.className = "status-line err";
+      return { ok: false, error: "apply failed" };
+    }
     const whz = window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM);
     const dist = near.length ? near[0].dist : null;
     el.fetchStatus.textContent =
@@ -1186,7 +1190,12 @@
     if (brg < 0) brg += 360;
     const dest = destination(camp.lat, camp.lon, distKm, brg);
     // Click moves the *camp* to that geographic point (re-center radar)
-    setCamp(camp.name, dest.lat, dest.lon);
+    // toFixed(5): destination() yields long floats; parseStrictDecimal caps at 8 decimals (SOC 2 B1)
+    if (!setCamp(camp.name, dest.lat.toFixed(5), dest.lon.toFixed(5))) {
+      el.fetchStatus.textContent = "Invalid location";
+      el.fetchStatus.className = "status-line err";
+      return;
+    }
     el.fetchStatus.textContent = "Camp pin moved via radar click · " + dest.lat.toFixed(5) + ", " + dest.lon.toFixed(5);
     el.fetchStatus.className = "status-line ok";
   });
@@ -1196,9 +1205,9 @@
   // init — optional ?lat=&lon=&name= (validated); default remains Hinton TEST pin
   const fromQuery = window.parseCampQueryParams(params, "Camp from URL");
   if (fromQuery.ok) {
-    setCamp(fromQuery.name, fromQuery.lat, fromQuery.lon);
+    setCamp(fromQuery.name, Number(fromQuery.lat).toFixed(5), Number(fromQuery.lon).toFixed(5));
   } else {
-    setCamp(DEFAULT.name, DEFAULT.lat, DEFAULT.lon);
+    setCamp(DEFAULT.name, Number(DEFAULT.lat).toFixed(5), Number(DEFAULT.lon).toFixed(5));
   }
   fetchFires();
   setInterval(fetchFires, REFRESH_MS);
