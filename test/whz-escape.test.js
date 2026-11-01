@@ -120,6 +120,37 @@ const picked = pickLiveExampleFire([
 assert(picked && picked.FIRE_NUMBER === "B2", "pickLiveExampleFire prefers BC Out of Control");
 assert(pickLiveExampleFire([]) === null, "pickLiveExampleFire empty → null");
 
+
+// --- panel text contrast over dark Windy (rgba(255,255,255,0.88) on #000) ---
+function relativeLuminance(hex) {
+  const h = String(hex).replace("#", "");
+  const toLin = (c) => {
+    const s = parseInt(c, 16) / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  const r = toLin(h.slice(0, 2)), g = toLin(h.slice(2, 4)), b = toLin(h.slice(4, 6));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function contrastRatio(fg, bg) {
+  const L1 = relativeLuminance(fg), L2 = relativeLuminance(bg);
+  const a = Math.max(L1, L2), b = Math.min(L1, L2);
+  return (a + 0.05) / (b + 0.05);
+}
+function compositeWhiteOver(alpha, backHex) {
+  const h = backHex.replace("#", "");
+  const br = parseInt(h.slice(0, 2), 16), bg = parseInt(h.slice(2, 4), 16), bb = parseInt(h.slice(4, 6), 16);
+  const r = Math.round(255 * alpha + br * (1 - alpha));
+  const g = Math.round(255 * alpha + bg * (1 - alpha));
+  const b = Math.round(255 * alpha + bb * (1 - alpha));
+  return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+const PANEL_ALPHA = 0.88;
+const panelOverBlack = compositeWhiteOver(PANEL_ALPHA, "#000000");
+assert(contrastRatio("475569", panelOverBlack) >= 4.5, "muted #475569 ≥4.5:1 on 0.88 white/#000");
+assert(contrastRatio("14532d", panelOverBlack) >= 4.5, "green-text #14532d ≥4.5:1 on 0.88 white/#000");
+assert(contrastRatio("92400e", panelOverBlack) >= 4.5, "amber-text #92400e ≥4.5:1 on 0.88 white/#000");
+assert(contrastRatio("142033", panelOverBlack) >= 4.5, "body text ≥4.5:1 on 0.88 white/#000");
+assert(contrastRatio("5a6b7d", panelOverBlack) < 4.5, "old muted would fail (sanity)");
 if (failed) {
   console.error("\n" + failed + " failure(s)");
   process.exit(1);
