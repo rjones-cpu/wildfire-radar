@@ -86,6 +86,14 @@ Authority boundary: UI surfaces plan actions; **evacuation order remains with TC
 - Observed winds: **ECCC SWOB** station markers. Rejected: Open-Meteo free (non-commercial), BCWS Access Only + empty probe, ACIS no CORS API, NOAA HRRR CONUS, NASA forecast.
 - SOC 2 B1 fix in `expandHourlyTimeRange` (PT0H / bad period → `[]`, max 500 steps) plus coverage allowlist + WCS body size cap.
 
+
+## 6d. Particle / SWOB visibility fix (local, not pushed)
+
+- Live `5a32fbc` had status “particles on · SWOB N” but nothing visible over hybrid: **project used `map.getProjection`+bounds while unproject used OverlayView container pixels** (asymmetric), UV grid only ~160 km, faint strokes, tiny station icons. Maps referrer failure could also swallow `#bgWindCanvas` if it was reparented into overlay panes.
+- Fix: OverlayView-only project/unproject; keep canvas as sibling (z-index 1000); restore canvas on Maps auth failure; mock-sat CSS; denser/brighter ~1.6 px trails; viewport UV cover; larger outlined station arrows (Maps markers + canvas fallback); MT/PT slider labels with UTC tooltip.
+- Screenshots: `/workspace/wildfire-radar-shots/53+`. **Do not push** until SOC 2 + Smart Lodge QA on the new SHA.
+
+
 ## 7. Local run
 
 ```bash

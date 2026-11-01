@@ -369,6 +369,20 @@ assert(fs.existsSync(path.join(root, "WIND-SOURCES.md")), "WIND-SOURCES.md prese
 assert(/HRDPS/i.test(fs.readFileSync(path.join(root, "WIND-SOURCES.md"), "utf8")), "WIND-SOURCES recommends HRDPS");
 assert(/Open-Meteo/i.test(fs.readFileSync(path.join(root, "WIND-SOURCES.md"), "utf8")) && /REJECT/i.test(fs.readFileSync(path.join(root, "WIND-SOURCES.md"), "utf8")), "WIND-SOURCES rejects Open-Meteo free");
 assert(indexHtmlMap.indexOf("windForecast") >= 0, "forecast slider present");
+assert(indexHtmlMap.indexOf("America/Edmonton") >= 0 && indexHtmlMap.indexOf("America/Vancouver") >= 0, "forecast labels use MT + PT zones");
+assert(indexHtmlMap.indexOf("formatUtcTooltip") >= 0, "UTC kept in tooltip helper");
+assert(indexHtmlMap.indexOf("map-mock-sat") >= 0, "mock satellite fallback class for local contrast");
+assert(indexHtmlMap.indexOf("fromLatLngToContainerPixel") >= 0, "OverlayView container pixel projection");
+assert(indexHtmlMap.indexOf("restoreOverlayNodes") >= 0, "Maps fallback restores wind canvas");
+assert(indexHtmlMap.indexOf("__radarOverlay") >= 0, "OverlayView projection helper attached");
+assert(indexHtmlMap.indexOf("windCoverRadiusKm") >= 0 || indexHtmlMap.indexOf("windCoverBbox") >= 0, "viewport wind cover helper");
+assert(/scale:\s*7/.test(indexHtmlMap), "SWOB station arrows enlarged (scale 7)");
+assert(indexHtmlMap.indexOf("strokeWeight: 2.4") >= 0 || indexHtmlMap.indexOf("strokeWeight:2.4") >= 0, "station arrows dark outline");
+const particlesSrc = fs.readFileSync(path.join(root, "wind-particles.js"), "utf8");
+assert(/lineWidth\s*=\s*1\.[56]/.test(particlesSrc), "particle stroke ~1.5–1.6px");
+assert(particlesSrc.indexOf("lighter") >= 0, "additive lighter composite for Windy glow");
+assert(/DEFAULT_COUNT\s*=\s*(2600|3200)/.test(particlesSrc), "dense particle count");
+
 assert(indexHtmlMap.indexOf("bgWindDir") < 0 && indexHtmlMap.indexOf("WINDARROWKMH") < 0, "legacy WMS arrow img removed");
 assert(indexHtmlMap.indexOf("buildEcccWindDirUrl") < 0, "page does not call WMS arrow builder");
 assert(indexHtmlMap.indexOf("scale: 10") >= 0, "fire markers enlarged (scale 10)");

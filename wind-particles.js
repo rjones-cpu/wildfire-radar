@@ -1,14 +1,14 @@
 /**
  * Windy-style particle streamlines on a canvas overlay.
- * Subtle cyan/white trails; respects prefers-reduced-motion.
+ * Bright white/cyan trails over satellite; respects prefers-reduced-motion.
  */
 (function (g) {
   "use strict";
 
-  var DEFAULT_COUNT = 900;
-  var REDUCED_COUNT = 180;
-  var MAX_AGE = 90;
-  var FADE = 0.92;
+  var DEFAULT_COUNT = 3200;
+  var REDUCED_COUNT = 400;
+  var MAX_AGE = 110;
+  var FADE = 0.90; // longer visible tails
 
   function prefersReducedMotion() {
     try {
@@ -21,22 +21,22 @@
     }
   }
 
-  /** Speed (m/s) → subtle stroke colour (not bright / garish). */
+  /** Speed (m/s) → bright white / light-cyan (readable on hybrid imagery). */
   function colorForSpeed(speed, alpha) {
-    var a = alpha == null ? 0.55 : alpha;
-    if (!Number.isFinite(speed)) return "rgba(180,210,230," + a + ")";
-    // Calm → soft grey-blue; moderate → cyan; stronger → pale white-blue
-    if (speed < 2) return "rgba(148,163,184," + a * 0.7 + ")";
-    if (speed < 5) return "rgba(125,185,210," + a + ")";
-    if (speed < 10) return "rgba(160,210,230," + Math.min(0.85, a + 0.1) + ")";
-    return "rgba(220,235,245," + Math.min(0.9, a + 0.15) + ")";
+    var a = alpha == null ? 0.95 : alpha;
+    if (!Number.isFinite(speed)) return "rgba(240,249,255," + a + ")";
+    // Bright cyan → white for satellite contrast (Windy-like).
+    if (speed < 2) return "rgba(165,243,252," + Math.max(0.55, a * 0.85) + ")";
+    if (speed < 5) return "rgba(125,211,252," + Math.min(1, a + 0.05) + ")";
+    if (speed < 10) return "rgba(224,242,254," + Math.min(1, a + 0.1) + ")";
+    return "rgba(255,255,255," + Math.min(1, a + 0.15) + ")";
   }
 
   /**
    * @param {HTMLCanvasElement} canvas
    * @param {object} opts
    *   getUv(lon, lat) -> {u,v,speed}|null
-   *   project(lon, lat) -> {x,y}|null  (canvas pixels)
+   *   project(lon, lat) -> {x,y}|null
    *   unproject(x, y) -> {lon,lat}|null
    *   isVisible() -> bool
    */
@@ -52,6 +52,8 @@
     function resize() {
       var w = canvas.clientWidth || canvas.width || 1;
       var h = canvas.clientHeight || canvas.height || 1;
+      if (w < 2) w = (canvas.parentElement && canvas.parentElement.clientWidth) || g.innerWidth || 1;
+      if (h < 2) h = (canvas.parentElement && canvas.parentElement.clientHeight) || g.innerHeight || 1;
       var dpr = Math.min(g.devicePixelRatio || 1, 2);
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
@@ -89,8 +91,8 @@
         Object.assign(p, spawnOne());
         return null;
       }
-      // Deg displacement per frame (approx): scale m/s → visual speed
-      var scale = reduced ? 0.018 : 0.028;
+      // Deg displacement per frame — tuned for dense readable flow
+      var scale = reduced ? 0.028 : 0.045;
       var dLon = (uv.u * scale) / Math.max(0.2, Math.cos((p.lat * Math.PI) / 180));
       var dLat = uv.v * scale;
       var nextLon = p.lon + dLon;
@@ -100,14 +102,18 @@
       p.lon = nextLon;
       p.lat = nextLat;
       p.age += 1;
+      var cw = canvas.clientWidth || 0;
+      var ch = canvas.clientHeight || 0;
       if (
         !from ||
         !to ||
+        !Number.isFinite(from.x) ||
+        !Number.isFinite(to.x) ||
         p.age > MAX_AGE ||
-        to.x < -20 ||
-        to.y < -20 ||
-        to.x > (canvas.clientWidth || 0) + 20 ||
-        to.y > (canvas.clientHeight || 0) + 20
+        to.x < -40 ||
+        to.y < -40 ||
+        to.x > cw + 40 ||
+        to.y > ch + 40
       ) {
         Object.assign(p, spawnOne());
         return null;
@@ -125,28 +131,30 @@
       }
       var w = canvas.clientWidth || 1;
       var h = canvas.clientHeight || 1;
-      // Fade previous trails (Windy-like persistence)
       ctx.globalCompositeOperation = "destination-out";
       ctx.fillStyle = "rgba(0,0,0," + (1 - FADE) + ")";
       ctx.fillRect(0, 0, w, h);
-      ctx.globalCompositeOperation = "source-over";
+      ctx.globalCompositeOperation = "lighter"; // additive glow like Windy
 
-      ctx.lineWidth = reduced ? 1.2 : 1.35;
+      ctx.lineWidth = 1.6;
       ctx.lineCap = "round";
       for (var i = 0; i < particles.length; i++) {
         var seg = stepParticle(particles[i]);
         if (!seg) continue;
         var ageFade = 1 - particles[i].age / MAX_AGE;
-        ctx.strokeStyle = colorForSpeed(seg.speed, 0.35 + 0.45 * ageFade);
+        ctx.strokeStyle = colorForSpeed(seg.speed, 0.7 + 0.3 * ageFade);
         ctx.beginPath();
         ctx.moveTo(seg.x0, seg.y0);
         ctx.lineTo(seg.x1, seg.y1);
         ctx.stroke();
       }
+      ctx.globalCompositeOperation = "source-over";
+      if (opts.afterFrame) {
+        try { opts.afterFrame(ctx, w, h); } catch (e) { /* ignore */ }
+      }
       frame += 1;
       if (reduced) {
-        // Draw a few frames then stop (static-ish streamlines)
-        if (frame > 40) {
+        if (frame > 50) {
           running = false;
           return;
         }
@@ -180,23 +188,24 @@
     }
 
     function redrawStatic() {
-      // One-shot denser static strokes for reduced-motion / fallback snapshot
       resize();
       resetParticles();
       ctx.clearRect(0, 0, canvas.clientWidth || 1, canvas.clientHeight || 1);
-      ctx.lineWidth = 1.4;
+      ctx.globalCompositeOperation = "lighter";
+      ctx.lineWidth = 1.6;
       ctx.lineCap = "round";
       for (var i = 0; i < particles.length; i++) {
-        for (var k = 0; k < 12; k++) {
+        for (var k = 0; k < 16; k++) {
           var seg = stepParticle(particles[i]);
           if (!seg) break;
-          ctx.strokeStyle = colorForSpeed(seg.speed, 0.45);
+          ctx.strokeStyle = colorForSpeed(seg.speed, 0.7);
           ctx.beginPath();
           ctx.moveTo(seg.x0, seg.y0);
           ctx.lineTo(seg.x1, seg.y1);
           ctx.stroke();
         }
       }
+      ctx.globalCompositeOperation = "source-over";
     }
 
     return {

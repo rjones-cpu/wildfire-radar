@@ -60,18 +60,50 @@
       object-fit: cover;
       display: block;
     }
+    /* Above Maps imagery panes (sibling stack); OverlayView may reparent into map panes. */
     .bg-map canvas#bgWindCanvas {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      z-index: 2;
+      z-index: 1000;
       pointer-events: none;
-      opacity: 0.92;
+      opacity: 1;
     }
     .bg-map canvas#bgWindCanvas.is-off { display: none; }
-    .bg-map img#bgSmoke { opacity: 0.55; z-index: 3; }
+    .bg-map img#bgSmoke { opacity: 0.55; z-index: 1001; }
     .bg-map img.is-off { display: none; }
+    /* Local/referrer fallback: dark satellite-like base so particles can be contrast-checked. */
+    .bg-map.map-mock-sat {
+      background:
+        radial-gradient(ellipse at 28% 35%, #1f4a32 0%, transparent 42%),
+        radial-gradient(ellipse at 72% 62%, #1a3048 0%, transparent 48%),
+        radial-gradient(ellipse at 50% 80%, #2a2218 0%, transparent 40%),
+        linear-gradient(165deg, #07140f 0%, #0c1824 40%, #050a12 100%);
+    }
+    /* Hide Maps error tile pane — it paints a light grey that kills contrast. */
+    .bg-map.map-mock-sat #bgGoogleMap {
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .bg-map.map-mock-sat .map-fallback.show {
+      background: transparent;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 10px 14px 0 0;
+    }
+    .bg-map.map-mock-sat .map-fallback.show > div {
+      max-width: 320px;
+      padding: 10px 12px;
+      font-size: 11px;
+      line-height: 1.35;
+      background: rgba(8, 14, 22, 0.72);
+      color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .bg-map.map-mock-sat .map-fallback.show strong { color: #f8fafc; }
     .map-controls .wind-forecast {
       display: block;
       margin-top: 6px;
@@ -82,6 +114,11 @@
       display: block;
       margin: 0 0 4px;
       cursor: default;
+    }
+    .map-controls .wind-forecast label strong {
+      font-weight: 650;
+      white-space: normal;
+      line-height: 1.35;
     }
     .map-controls input[type="range"] {
       width: 100%;
@@ -909,8 +946,48 @@
     elBg.windStatus.classList.toggle("err", !!isErr);
   }
 
+  function restoreOverlayNodes() {
+    const bgRoot = document.getElementById("bgMap");
+    if (!bgRoot) return;
+    // Maps auth failure can destroy overlay panes that briefly hosted the canvas.
+    ["bgWindCanvas", "bgSmoke"].forEach(function (id) {
+      let node = document.getElementById(id);
+      if (!node) {
+        // Recreate if Maps wiped the node entirely.
+        if (id === "bgWindCanvas") {
+          node = document.createElement("canvas");
+          node.id = "bgWindCanvas";
+          node.setAttribute("aria-hidden", "true");
+          elBg.windCanvas = node;
+          windField = null; // force recreate against new canvas
+        } else {
+          node = document.createElement("img");
+          node.id = "bgSmoke";
+          node.className = "is-off";
+          node.alt = "";
+          node.decoding = "async";
+          elBg.smoke = node;
+        }
+      }
+      if (node.parentElement !== bgRoot) {
+        // Keep fallback notice first; append overlays above the map div.
+        bgRoot.appendChild(node);
+      }
+    });
+    elBg.windCanvas = document.getElementById("bgWindCanvas");
+    elBg.smoke = document.getElementById("bgSmoke");
+  }
+
   function showMapFallback(reason) {
     gmapFailed = true;
+    gmapReady = false;
+    if (gmap && gmap.__radarOverlay) {
+      try { gmap.__radarOverlay.setMap(null); } catch (e) { /* ignore */ }
+      gmap.__radarOverlay = null;
+    }
+    const bgRoot = document.getElementById("bgMap");
+    if (bgRoot) bgRoot.classList.add("map-mock-sat");
+    restoreOverlayNodes();
     if (elBg.fallback) {
       elBg.fallback.classList.add("show");
       const detail = reason ? (" " + String(reason)) : "";
@@ -925,6 +1002,8 @@
     // Particles can still run over the dark fallback using equirectangular projection.
     ensureWindField();
     if (windGrid) restartWindAnimation();
+    ensureStationPaintLoop();
+    drawFallbackStationArrows();
   }
 
   function mapPixelSize() {
@@ -957,36 +1036,31 @@
     };
   }
 
+  /**
+   * IMPORTANT: project + unproject must share one path.
+   * Prefer OverlayView MapCanvasProjection (container pixels).
+   * The old map.getProjection()+bounds path disagreed with OverlayView
+   * unproject and drew particles off-screen over hybrid tiles.
+   */
+  function overlayProjection() {
+    if (!gmapReady || !gmap || !window.google || !google.maps) return null;
+    const ov = gmap.__radarOverlay;
+    if (!ov || !ov.getProjection) return null;
+    try {
+      return ov.getProjection() || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function projectLonLat(lon, lat) {
     const w = (elBg.windCanvas && elBg.windCanvas.clientWidth) || window.innerWidth || 1;
     const h = (elBg.windCanvas && elBg.windCanvas.clientHeight) || window.innerHeight || 1;
-    if (gmapReady && gmap && window.google && google.maps) {
+    const gp = overlayProjection();
+    if (gp && gp.fromLatLngToContainerPixel) {
       try {
-        const proj = gmap.getProjection && gmap.getProjection();
-        const bounds = gmap.getBounds && gmap.getBounds();
-        if (proj && bounds) {
-          const ne = bounds.getNorthEast();
-          const sw = bounds.getSouthWest();
-          const topRight = proj.fromLatLngToPoint(ne);
-          const bottomLeft = proj.fromLatLngToPoint(sw);
-          const world = proj.fromLatLngToPoint(new google.maps.LatLng(lat, lon));
-          if (topRight && bottomLeft && world) {
-            const x =
-              ((world.x - bottomLeft.x) / (topRight.x - bottomLeft.x)) * w;
-            const y =
-              ((world.y - topRight.y) / (bottomLeft.y - topRight.y)) * h;
-            if (Number.isFinite(x) && Number.isFinite(y)) return { x: x, y: y };
-          }
-        }
-        // OverlayView-style container pixel when available
-        const ov = gmap.__radarOverlay;
-        if (ov && ov.getProjection) {
-          const gp = ov.getProjection();
-          if (gp && gp.fromLatLngToContainerPixel) {
-            const pt = gp.fromLatLngToContainerPixel(new google.maps.LatLng(lat, lon));
-            if (pt) return { x: pt.x, y: pt.y };
-          }
-        }
+        const pt = gp.fromLatLngToContainerPixel(new google.maps.LatLng(lat, lon));
+        if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)) return { x: pt.x, y: pt.y };
       } catch (e) { /* fall through */ }
     }
     const b = fallbackBounds();
@@ -998,28 +1072,11 @@
   function unprojectXY(x, y) {
     const w = (elBg.windCanvas && elBg.windCanvas.clientWidth) || window.innerWidth || 1;
     const h = (elBg.windCanvas && elBg.windCanvas.clientHeight) || window.innerHeight || 1;
-    if (gmapReady && gmap && window.google && google.maps) {
+    const gp = overlayProjection();
+    if (gp && gp.fromContainerPixelToLatLng) {
       try {
-        const ov = gmap.__radarOverlay;
-        if (ov && ov.getProjection) {
-          const gp = ov.getProjection();
-          if (gp && gp.fromContainerPixelToLatLng) {
-            const ll = gp.fromContainerPixelToLatLng(new google.maps.Point(x, y));
-            if (ll) return { lon: ll.lng(), lat: ll.lat() };
-          }
-        }
-        const proj = gmap.getProjection && gmap.getProjection();
-        const bounds = gmap.getBounds && gmap.getBounds();
-        if (proj && bounds) {
-          const ne = bounds.getNorthEast();
-          const sw = bounds.getSouthWest();
-          const topRight = proj.fromLatLngToPoint(ne);
-          const bottomLeft = proj.fromLatLngToPoint(sw);
-          const wx = bottomLeft.x + (x / w) * (topRight.x - bottomLeft.x);
-          const wy = topRight.y + (y / h) * (bottomLeft.y - topRight.y);
-          const ll = proj.fromPointToLatLng(new google.maps.Point(wx, wy));
-          if (ll) return { lon: ll.lng(), lat: ll.lat() };
-        }
+        const ll = gp.fromContainerPixelToLatLng(new google.maps.Point(x, y));
+        if (ll) return { lon: ll.lng(), lat: ll.lat() };
       } catch (e) { /* fall through */ }
     }
     const b = fallbackBounds();
@@ -1040,6 +1097,10 @@
       unproject: unprojectXY,
       isVisible: function () {
         return !!(elBg.togWind && elBg.togWind.checked);
+      },
+      afterFrame: function () {
+        // When Maps markers are unavailable, paint SWOB arrows on the wind canvas.
+        if (!gmapReady) drawFallbackStationArrows();
       },
     });
     return windField;
@@ -1075,16 +1136,26 @@
   function attachMapsOverlayHelper() {
     if (!gmapReady || !gmap || !window.google || !google.maps) return;
     if (gmap.__radarOverlay) return;
+    // Projection helper only. Keep #bgWindCanvas as a sibling of #bgGoogleMap
+    // (z-index 1000) so RefererNotAllowed / billing errors cannot destroy it
+    // when Maps wipes overlay panes.
     const Overlay = function () {};
     Overlay.prototype = new google.maps.OverlayView();
     Overlay.prototype.onAdd = function () {};
-    Overlay.prototype.draw = function () {};
+    Overlay.prototype.draw = function () {
+      if (windField) windField.resize();
+    };
     Overlay.prototype.onRemove = function () {};
     const ov = new Overlay();
     ov.setMap(gmap);
     gmap.__radarOverlay = ov;
     google.maps.event.addListener(gmap, "idle", function () {
+      if (!gmapReady || gmapFailed) return;
       restartWindAnimation();
+      syncStationMarkers();
+    });
+    google.maps.event.addListener(gmap, "bounds_changed", function () {
+      if (windField) windField.resize();
     });
   }
 
@@ -1138,21 +1209,83 @@
     return ecccTime;
   }
 
+  function formatInZone(iso, timeZone, shortLabel) {
+    if (!iso) return "—";
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) return String(iso);
+    try {
+      const fmt = new Intl.DateTimeFormat("en-CA", {
+        timeZone: timeZone,
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZoneName: "short",
+      });
+      return fmt.format(new Date(ms)).replace(",", "") + " (" + shortLabel + ")";
+    } catch (e) {
+      return String(iso);
+    }
+  }
+
+  function formatUtcTooltip(iso) {
+    if (!iso) return "UTC —";
+    return (
+      "UTC: " +
+      String(iso).replace("T", " ").replace(/:00Z$/, " Z").replace(/Z$/, " Z")
+    );
+  }
+
+  /** Slider label: America/Edmonton + America/Vancouver; UTC in title tooltip. */
   function updateForecastLabel() {
     const t = selectedWindTime();
-    const label = t ? t.replace("T", " ").replace(/:00Z$/, " Z") : "—";
     const hours =
-      windTimes.length && ecccTime
+      windTimes.length && ecccTime && t
         ? Math.round((Date.parse(t) - Date.parse(ecccTime)) / 3600000)
         : windHourOffset;
+    const hourTxt = hours <= 0 ? "now" : "+" + hours + " h";
+    const mt = formatInZone(t, "America/Edmonton", "MT");
+    const pt = formatInZone(t, "America/Vancouver", "PT");
     if (elBg.forecastLabel) {
       elBg.forecastLabel.textContent =
-        (hours <= 0 ? "now" : "+" + hours + " h") + " · valid " + label;
+        hourTxt + " · " + mt + " · " + pt;
+      elBg.forecastLabel.title = formatUtcTooltip(t);
+      elBg.forecastLabel.setAttribute("aria-label", hourTxt + ", " + formatUtcTooltip(t));
     }
     if (elBg.forecast) {
       elBg.forecast.setAttribute("aria-valuenow", String(windHourOffset));
       elBg.forecast.value = String(windHourOffset);
+      elBg.forecast.title = formatUtcTooltip(t);
     }
+  }
+
+  /** Radius so UV grid covers the full viewport (corners beyond WHZ ring). */
+  function windCoverRadiusKm() {
+    const base = (ML && ML.DEFAULT_RADIUS_KM) || 160;
+    // Viewport diagonal ≈ base * √2; pad ~25% so particles never hit empty UV.
+    return Math.ceil(base * 1.55);
+  }
+
+  function windCoverBbox(lat, lon) {
+    if (gmapReady && gmap && gmap.getBounds) {
+      try {
+        const b = gmap.getBounds();
+        if (b) {
+          const ne = b.getNorthEast();
+          const sw = b.getSouthWest();
+          const padLat = (ne.lat() - sw.lat()) * 0.12;
+          const padLon = (ne.lng() - sw.lng()) * 0.12;
+          return {
+            west: sw.lng() - padLon,
+            east: ne.lng() + padLon,
+            south: sw.lat() - padLat,
+            north: ne.lat() + padLat,
+          };
+        }
+      } catch (e) { /* fall through */ }
+    }
+    return WG ? WG.bboxAroundCamp(lat, lon, windCoverRadiusKm()) : null;
   }
 
   async function loadWindGrid(lat, lon) {
@@ -1166,12 +1299,15 @@
       updateForecastLabel();
       const inHrdps =
         !!(time && hrdpsTimes.length && hrdpsTimes.indexOf(time) >= 0);
+      const coverR = windCoverRadiusKm();
+      const coverBox = windCoverBbox(lat, lon);
       const grid = await WG.fetchEcccUvGrid({
         lat: lat,
         lon: lon,
-        radiusKm: (ML && ML.DEFAULT_RADIUS_KM) || 160,
+        radiusKm: coverR,
+        bbox: coverBox || undefined,
         time: time,
-        size: 28,
+        size: 36,
         preferRdps: !inHrdps,
       });
       if (gen !== windLoadGen) return;
@@ -1179,12 +1315,8 @@
       grid.referenceTime = ecccRefTime;
       windGrid = grid;
       windModelLabel = grid.model || (inHrdps ? "HRDPS-WEonG" : "RDPS");
-      const runLabel = ecccRefTime
-        ? ecccRefTime.replace("T", " ").replace(/:00Z$/, " Z")
-        : "—";
-      const validLabel = time
-        ? time.replace("T", " ").replace(/:00Z$/, " Z")
-        : "—";
+      const runLabel = formatInZone(ecccRefTime, "America/Edmonton", "MT");
+      const validLabel = formatInZone(time, "America/Edmonton", "MT");
       setWindStatus(
         "ECCC " +
           windModelLabel +
@@ -1195,6 +1327,10 @@
           " · particles on",
         false
       );
+      if (elBg.windStatus) {
+        elBg.windStatus.title =
+          formatUtcTooltip(ecccRefTime) + " · valid " + formatUtcTooltip(time);
+      }
       restartWindAnimation();
       loadWindStations(lat, lon);
     } catch (err) {
@@ -1209,6 +1345,71 @@
         true
       );
     }
+  }
+
+
+  function drawFallbackStationArrows() {
+    if (gmapReady) return; // Google Markers handle it
+    const canvas = elBg.windCanvas;
+    if (!canvas || !(elBg.togStations && elBg.togStations.checked)) return;
+    if (!windStations || !windStations.length) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const w = canvas.clientWidth || 1;
+    const h = canvas.clientHeight || 1;
+    // Draw above particle trails without clearing them: stroke arrows each frame via separate pass.
+    windStations.forEach(function (st) {
+      const pt = projectLonLat(st.lon, st.lat);
+      if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) return;
+      if (pt.x < -20 || pt.y < -20 || pt.x > w + 20 || pt.y > h + 20) return;
+      const from = st.dirFromDeg != null ? Number(st.dirFromDeg) : 0;
+      const toRad = ((from + 180) * Math.PI) / 180;
+      const len = 18;
+      const x1 = pt.x - Math.sin(toRad) * len;
+      const y1 = pt.y + Math.cos(toRad) * len;
+      const x2 = pt.x + Math.sin(toRad) * len;
+      const y2 = pt.y - Math.cos(toRad) * len;
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      // Dark outline
+      ctx.strokeStyle = "#0b1220";
+      ctx.lineWidth = 6.5;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      // arrow head
+      const hx = x2;
+      const hy = y2;
+      const left = toRad + Math.PI * 0.82;
+      const right = toRad - Math.PI * 0.82;
+      ctx.lineTo(hx + Math.sin(left) * 10, hy - Math.cos(left) * 10);
+      ctx.moveTo(hx, hy);
+      ctx.lineTo(hx + Math.sin(right) * 10, hy - Math.cos(right) * 10);
+      ctx.stroke();
+      // Bright fill stroke
+      ctx.strokeStyle = "#f0f9ff";
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineTo(hx + Math.sin(left) * 10, hy - Math.cos(left) * 10);
+      ctx.moveTo(hx, hy);
+      ctx.lineTo(hx + Math.sin(right) * 10, hy - Math.cos(right) * 10);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  let stationPaintTimer = 0;
+  function ensureStationPaintLoop() {
+    if (stationPaintTimer) return;
+    stationPaintTimer = window.setInterval(function () {
+      if (!(elBg.togStations && elBg.togStations.checked)) return;
+      if (gmapReady) return;
+      drawFallbackStationArrows();
+    }, 200);
   }
 
   function clearStationMarkers() {
@@ -1241,15 +1442,16 @@
         map: gmap,
         position: { lat: st.lat, lng: st.lon },
         title: st.name + " · " + spdTxt + " from " + fromTxt,
-        zIndex: 400,
+        zIndex: 1200,
         icon: {
           path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-          scale: 4,
+          scale: 7,
           rotation: toDeg,
-          fillColor: "#e2e8f0",
-          fillOpacity: 0.95,
-          strokeColor: "#0f172a",
-          strokeWeight: 1.2,
+          fillColor: "#f0f9ff",
+          fillOpacity: 1,
+          strokeColor: "#0b1220",
+          strokeWeight: 2.4,
+          anchor: new google.maps.Point(0, 2.2),
         },
       });
       const info = new google.maps.InfoWindow({
@@ -1282,9 +1484,7 @@
     }
     const gen = ++stationLoadGen;
     try {
-      const box = WG
-        ? WG.bboxAroundCamp(lat, lon, (ML && ML.DEFAULT_RADIUS_KM) || 160)
-        : null;
+      const box = windCoverBbox(lat, lon);
       if (!box) return;
       const end = new Date();
       const start = new Date(end.getTime() - 3 * 3600 * 1000);
@@ -1303,6 +1503,8 @@
       if (gen !== stationLoadGen) return;
       windStations = list;
       syncStationMarkers();
+      ensureStationPaintLoop();
+      if (!gmapReady) drawFallbackStationArrows();
       if (elBg.windStatus && !elBg.windStatus.classList.contains("err")) {
         const base = elBg.windStatus.textContent || "";
         if (base.indexOf("SWOB") < 0) {
@@ -1399,6 +1601,8 @@
         backgroundColor: "#0b1220",
       });
       gmapReady = true;
+      const bgRoot = document.getElementById("bgMap");
+      if (bgRoot) bgRoot.classList.remove("map-mock-sat");
       if (elBg.fallback) elBg.fallback.classList.remove("show");
       syncGoogleMarkers();
       attachMapsOverlayHelper();
@@ -1414,8 +1618,9 @@
 
   window.gm_authFailure = function () {
     gmapReady = false;
-    gmap = null;
+    // Restore canvas before dropping gmap ref (overlay panes may already be gone).
     showMapFallback("(Maps auth / billing / referrer rejected this origin)");
+    gmap = null;
   };
 
   function loadGoogleMapsScript() {

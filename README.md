@@ -34,7 +34,7 @@ Full-page **Google Maps** hybrid basemap behind the transparent radar (Maps Java
 | Smoke | NASA GIBS WMS | `OMPS_Aerosol_Index` | off (toggle) |
 
 - Google’s logo and map-data attribution render on the map itself (required).
-- If Maps fails to load (billing / referrer), a fallback message is shown; radar + fire feeds + **wind particles** still run over the dark fallback.
+- If Maps fails to load (billing / referrer), a dark **mock-satellite** background is shown (Maps error pane hidden); radar + fire feeds + **wind particles** + canvas SWOB arrows still run. Forecast slider labels use **America/Edmonton (MT)** and **America/Vancouver (PT)** with UTC in the tooltip.
 - ECCC GeoMet: attribute **Data Source: Environment and Climate Change Canada**; show model **run** (`reference_time`) and **valid** TIME in the map controls. Light WCS refresh (~30 min). Legacy WMS **WINDARROWKMH** arrow images and HRDPS WindSpeed colour washes are **not** used.
 - **NASA for forecast wind — not used:** NASA POWER is official and CORS-friendly (`Access-Control-Allow-Origin: *`) but returns **analysis / NRT** hourly series, not a usable multi-day forecast (future hours are fill `-999`). NASA GEOS-FP is download-oriented (NCCS), not a browser CORS forecast API. Optional **GIBS smoke** remains (imagery acknowledgment; no NASA endorsement).
 - No Windy.com or other unofficial wind APIs.

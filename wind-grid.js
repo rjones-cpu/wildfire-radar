@@ -450,7 +450,19 @@
     var lat = opts.lat;
     var lon = opts.lon;
     if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) throw new Error("bad lat/lon");
-    var box = bboxAroundCamp(lat, lon, opts.radiusKm);
+    var box =
+      opts.bbox &&
+      isFiniteNumber(opts.bbox.west) &&
+      isFiniteNumber(opts.bbox.east) &&
+      isFiniteNumber(opts.bbox.south) &&
+      isFiniteNumber(opts.bbox.north)
+        ? {
+            west: opts.bbox.west,
+            east: opts.bbox.east,
+            south: opts.bbox.south,
+            north: opts.bbox.north,
+          }
+        : bboxAroundCamp(lat, lon, opts.radiusKm);
     var time = validateIsoTime(opts.time);
     var size = opts.size || 28;
     var preferRdps = !!opts.preferRdps;
