@@ -7,22 +7,27 @@
   <title>LodgeX Wildfire Preparedness · Radar</title>
   <style>
     :root {
-      --bg: #070b10;
-      --panel: #0f1620;
-      --border: #1e2a3a;
-      --green: #2ee66d;
-      --green-dim: rgba(46, 230, 109, 0.25);
-      --amber: #f5a524;
-      --red: #ff4d4d;
-      --text: #e8eef5;
-      --muted: #8a9bb0;
-      --ring: rgba(46, 230, 109, 0.35);
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --border: #d0d8e2;
+      --green: #1a9e4a;
+      --green-bright: #2ee66d;
+      --green-dim: rgba(26, 158, 74, 0.22);
+      --amber: #c47a00;
+      --amber-bright: #f5a524;
+      --red: #d62828;
+      --red-bright: #ff4d4d;
+      --text: #142033;
+      --muted: #5a6b7d;
+      --ring: rgba(26, 158, 74, 0.55);
+      --surface: #f0f4f8;
+      --input-bg: #ffffff;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      background: radial-gradient(ellipse at top, #101820 0%, var(--bg) 55%);
+      background: radial-gradient(ellipse at top, #ffffff 0%, var(--bg) 60%);
       color: var(--text);
       min-height: 100vh;
     }
@@ -34,7 +39,7 @@
       gap: 12px;
       padding: 16px 20px;
       border-bottom: 1px solid var(--border);
-      background: rgba(15, 22, 32, 0.9);
+      background: rgba(255, 255, 255, 0.96);
     }
     header h1 {
       margin: 0;
@@ -49,16 +54,16 @@
       font-weight: 700;
       padding: 3px 8px;
       border-radius: 999px;
-      background: #3a2a08;
-      color: var(--amber);
-      border: 1px solid #6a4e10;
+      background: #fff4d6;
+      color: #8a5a00;
+      border: 1px solid #e0b84a;
       vertical-align: middle;
       margin-left: 8px;
     }
     .badge.test {
-      background: #3a1010;
-      color: #ff8a8a;
-      border-color: #6a2020;
+      background: #ffe0e0;
+      color: #a32020;
+      border-color: #e08080;
     }
     .meta {
       font-size: 0.8rem;
@@ -107,7 +112,7 @@
       padding: 8px 10px;
       border-radius: 8px;
       border: 1px solid var(--border);
-      background: #0a1018;
+      background: var(--input-bg);
       color: var(--text);
       font-size: 0.9rem;
     }
@@ -119,16 +124,17 @@
     button {
       cursor: pointer;
       border: 1px solid var(--border);
-      background: #152030;
+      background: #eef2f7;
       color: var(--text);
       border-radius: 8px;
       padding: 8px 12px;
       font-size: 0.85rem;
     }
     button.primary {
-      background: linear-gradient(180deg, #1d4a2e, #143522);
-      border-color: #2a6a42;
-      color: #b8ffd0;
+      background: linear-gradient(180deg, #2bb85a, #1a9e4a);
+      border-color: #15803d;
+      color: #ffffff;
+      font-weight: 650;
     }
     button:hover { filter: brightness(1.1); }
     .hint {
@@ -142,8 +148,8 @@
       font-size: 0.8rem;
       color: var(--muted);
     }
-    .status-line.err { color: var(--red); }
-    .status-line.ok { color: var(--green); }
+    .status-line.err { color: var(--red); font-weight: 650; }
+    .status-line.ok { color: var(--green); font-weight: 650; }
     .radar-wrap {
       position: relative;
       display: flex;
@@ -156,12 +162,12 @@
       width: min(100%, 640px);
       aspect-ratio: 1;
       border-radius: 50%;
-      background: #050a0e;
-      border: 2px solid #1a3a28;
+      background: #e8eef5;
+      border: 2px solid #1a9e4a;
       box-shadow:
-        0 0 0 1px #0d2018,
-        inset 0 0 60px rgba(46, 230, 109, 0.08),
-        0 0 40px rgba(0,0,0,0.5);
+        0 0 0 1px #c8e6d4,
+        inset 0 0 40px rgba(26, 158, 74, 0.06),
+        0 8px 28px rgba(20, 32, 51, 0.12);
       overflow: hidden;
     }
     /* Free Windy embed behind radar overlays (no API key). pointer-events none so canvas stays clickable. */
@@ -173,7 +179,7 @@
       border: 0;
       z-index: 0;
       pointer-events: none;
-      filter: saturate(0.85) brightness(0.72);
+      filter: saturate(0.95) brightness(1.05);
       transform: scale(1.02);
     }
     .radar-scrim {
@@ -183,7 +189,7 @@
       pointer-events: none;
       border-radius: 50%;
       background:
-        radial-gradient(circle at center, rgba(5,10,14,0.22) 0%, rgba(5,10,14,0.40) 55%, rgba(5,10,14,0.58) 100%);
+        radial-gradient(circle at center, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.28) 55%, rgba(244,247,251,0.45) 100%);
     }
     canvas#radar {
       position: absolute;
@@ -201,8 +207,9 @@
       top: 50%;
       transform: translate(-50%, 14px);
       font-size: 0.7rem;
-      color: #b8ffd0;
-      background: rgba(0,0,0,0.55);
+      color: #0d3d22;
+      background: rgba(255,255,255,0.88);
+      border: 1px solid #1a9e4a;
       padding: 2px 8px;
       border-radius: 4px;
       pointer-events: none;
@@ -218,7 +225,7 @@
       text-align: center;
       margin: 0;
     }
-    .windy-credit a { color: #8ab4ff; }
+    .windy-credit a { color: #1a5fb4; }
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -247,9 +254,9 @@
       border-radius: 10px;
       padding: 10px 12px;
       margin-bottom: 8px;
-      background: #0a121a;
+      background: var(--surface);
     }
-    .fire-list li:hover { border-color: #2a4a38; }
+    .fire-list li:hover { border-color: #1a9e4a; }
     .fire-list .name {
       font-weight: 650;
       color: var(--green);
@@ -270,22 +277,22 @@
     }
     .test-banner {
       display: none;
-      background: #4a1515;
-      color: #ffc9c9;
+      background: #ffe8e8;
+      color: #8b1515;
       text-align: center;
       padding: 8px;
       font-size: 0.85rem;
       font-weight: 650;
-      border-bottom: 1px solid #7a3030;
+      border-bottom: 1px solid #e0a0a0;
     }
     .test-banner.show { display: block; }
     footer {
       text-align: center;
       font-size: 0.7rem;
-      color: #5a6a7a;
+      color: #5a6b7d;
       padding: 12px 16px 24px;
     }
-    footer a { color: #7a9aba; }
+    footer a { color: #1a5fb4; }
 
     .whz-banner {
       display: flex;
@@ -295,7 +302,7 @@
       gap: 10px;
       padding: 12px 20px;
       border-bottom: 1px solid var(--border);
-      background: #0c141c;
+      background: #ffffff;
       font-size: 0.9rem;
     }
     .whz-banner .level {
@@ -307,11 +314,11 @@
       text-transform: uppercase;
       font-size: 0.8rem;
     }
-    .whz-banner .level.none { background:#152030; color: var(--muted); }
-    .whz-banner .level.alert { background:#1a2a18; color: var(--green); border-color:#2a6a42; }
-    .whz-banner .level.level1 { background:#3a2a08; color: var(--amber); border-color:#6a4e10; }
-    .whz-banner .level.level2 { background:#3a2010; color:#ff9a4d; border-color:#6a3a18; }
-    .whz-banner .level.level3 { background:#3a1010; color: var(--red); border-color:#6a2020; }
+    .whz-banner .level.none { background:#eef2f7; color: var(--muted); border-color:#c5ced8; }
+    .whz-banner .level.alert { background:#e6f7ec; color: #0f7a38; border-color:#1a9e4a; }
+    .whz-banner .level.level1 { background:#fff4d6; color: #8a5a00; border-color:#e0b84a; }
+    .whz-banner .level.level2 { background:#ffe8d0; color: #b84e00; border-color:#f0a060; }
+    .whz-banner .level.level3 { background:#ffe0e0; color: #a32020; border-color:#e07070; }
     .whz-banner .reason { color: var(--muted); flex: 1; min-width: 200px; }
     .whz-banner .reason strong { color: var(--text); }
     .tabs {
@@ -324,12 +331,13 @@
       padding: 6px 10px;
       font-size: 0.75rem;
       border-radius: 999px;
-      background: #0a121a;
+      background: #eef2f7;
     }
     .tabs button.active {
-      background: #1d4a2e;
-      border-color: #2a6a42;
-      color: #b8ffd0;
+      background: #1a9e4a;
+      border-color: #15803d;
+      color: #ffffff;
+      font-weight: 650;
     }
     .tab-pane { display: none; }
     .tab-pane.active { display: block; }
@@ -339,21 +347,21 @@
     .action-list li, .route-steps li, .contact-list li, .gap-list li, .muster-steps li {
       font-size: 0.82rem;
       color: var(--text);
-      border-left: 3px solid #2a6a42;
+      border-left: 3px solid #1a9e4a;
       padding: 6px 10px;
       margin-bottom: 6px;
-      background: #0a121a;
+      background: var(--surface);
       border-radius: 0 8px 8px 0;
       line-height: 1.4;
     }
-    .action-list li.active-whz { border-left-color: var(--amber); background: #1a1408; }
-    .gap-list li { border-left-color: #6a4e10; color: var(--muted); }
+    .action-list li.active-whz { border-left-color: var(--amber-bright); background: #fff8e8; }
+    .gap-list li { border-left-color: #c47a00; color: var(--muted); }
     .route-card {
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 10px 12px;
       margin-bottom: 10px;
-      background: #0a121a;
+      background: var(--surface);
     }
     .route-card h3 {
       margin: 0 0 6px;
@@ -380,7 +388,7 @@
       border-radius: 8px;
       padding: 8px 10px;
       margin-bottom: 8px;
-      background: #0a121a;
+      background: var(--surface);
     }
     .whz-all summary {
       cursor: pointer;
@@ -400,7 +408,7 @@
       text-align: left;
       vertical-align: top;
     }
-    .aq-table th { background: #152030; color: var(--muted); font-weight: 650; }
+    .aq-table th { background: #e8eef5; color: var(--muted); font-weight: 650; }
     main.with-prep {
       grid-template-columns: minmax(260px, 340px) 1fr minmax(280px, 400px);
     }
@@ -420,8 +428,8 @@
       vertical-align: middle;
       letter-spacing: 0.04em;
     }
-    .src-badge.ab { background: #1a3a28; color: #8dffb0; border: 1px solid #2a6a42; }
-    .src-badge.bc { background: #102038; color: #8ab4ff; border: 1px solid #2a4a7a; }
+    .src-badge.ab { background: #e6f7ec; color: #0f7a38; border: 1px solid #1a9e4a; }
+    .src-badge.bc { background: #e8f0ff; color: #1a5fb4; border: 1px solid #5a8fd4; }
   </style>
 </head>
 <body>
@@ -1118,8 +1126,8 @@
 
     ctx.clearRect(0, 0, w, h);
 
-    // Light tint only — Windy iframe shows through (keep rings/fires readable)
-    ctx.fillStyle = "rgba(5, 10, 14, 0.18)";
+    // Very light tint — Windy shows through; rings stay high-contrast on light theme
+    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
     ctx.beginPath();
     ctx.arc(cx, cy, maxR + 8, 0, Math.PI * 2);
     ctx.fill();
@@ -1129,16 +1137,20 @@
       const r = (km / RADIUS_KM) * maxR;
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(46, 230, 109, 0.28)";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(15, 122, 56, 0.75)";
+      ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.fillStyle = "rgba(46, 230, 109, 0.55)";
-      ctx.font = "11px Segoe UI, sans-serif";
+      ctx.font = "bold 11px Segoe UI, sans-serif";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.strokeText(km + " km", cx + 4, cy - r + 12);
+      ctx.fillStyle = "#0f7a38";
       ctx.fillText(km + " km", cx + 4, cy - r + 12);
     });
 
     // crosshairs
-    ctx.strokeStyle = "rgba(46, 230, 109, 0.2)";
+    ctx.strokeStyle = "rgba(15, 122, 56, 0.45)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(cx - maxR, cy);
     ctx.lineTo(cx + maxR, cy);
@@ -1147,37 +1159,35 @@
     ctx.stroke();
 
     // cardinal labels
-    ctx.fillStyle = "rgba(138, 155, 176, 0.9)";
-    ctx.font = "12px Segoe UI, sans-serif";
+    ctx.font = "bold 12px Segoe UI, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("N", cx, cy - maxR + 14);
-    ctx.fillText("S", cx, cy + maxR - 6);
-    ctx.fillText("W", cx - maxR + 12, cy + 4);
-    ctx.fillText("E", cx + maxR - 12, cy + 4);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    [["N", cx, cy - maxR + 14], ["S", cx, cy + maxR - 6], ["W", cx - maxR + 12, cy + 4], ["E", cx + maxR - 12, cy + 4]].forEach(([lab, x, y]) => {
+      ctx.strokeText(lab, x, y);
+      ctx.fillStyle = "#142033";
+      ctx.fillText(lab, x, y);
+    });
     ctx.textAlign = "start";
 
     // sweep wedge
     const sweepWidth = Math.PI / 5;
-    const grad = ctx.createConicalGradient
-      ? null
-      : null;
-    // approximate conical with arc wedge + fade
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, maxR, sweep - sweepWidth, sweep, false);
     ctx.closePath();
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
-    g.addColorStop(0, "rgba(46, 230, 109, 0.35)");
-    g.addColorStop(1, "rgba(46, 230, 109, 0.02)");
+    g.addColorStop(0, "rgba(26, 158, 74, 0.40)");
+    g.addColorStop(1, "rgba(26, 158, 74, 0.04)");
     ctx.fillStyle = g;
     ctx.fill();
     // leading edge
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.cos(sweep) * maxR, cy + Math.sin(sweep) * maxR);
-    ctx.strokeStyle = "rgba(46, 230, 109, 0.85)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(15, 122, 56, 0.95)";
+    ctx.lineWidth = 2.5;
     ctx.stroke();
     ctx.restore();
 
@@ -1217,8 +1227,11 @@
 
       // label
       ctx.font = (highlight ? "bold " : "") + "11px Segoe UI, sans-serif";
-      ctx.fillStyle = "#e8eef5";
       const tag = (f.SOURCE ? f.SOURCE + " " : "") + (f.FIRE_NUMBER || f.LABEL || "?");
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.strokeText(tag, x + 9, y - 6);
+      ctx.fillStyle = "#142033";
       ctx.fillText(tag, x + 9, y - 6);
     });
 
