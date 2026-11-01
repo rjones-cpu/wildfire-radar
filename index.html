@@ -8,7 +8,7 @@
   <style>
     :root {
       --bg: #f4f7fb;
-      --panel: #ffffff;
+      --panel: rgba(255, 255, 255, 0.88);
       --border: #d0d8e2;
       --green: #15803d;
       --green-dim: rgba(21, 128, 61, 0.22);
@@ -19,15 +19,32 @@
       --muted: #5a6b7d;
       --ring: rgba(21, 128, 61, 0.85);
       --surface: #f0f4f8;
-      --input-bg: #ffffff;
+      --input-bg: #ffffff; /* solid — WCAG text fields */
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      background: radial-gradient(ellipse at top, #ffffff 0%, var(--bg) 60%);
+      background: transparent;
       color: var(--text);
       min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+    /* Full-viewport Windy wind map behind all UI (Ralph). */
+    .windy-page-bg {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      z-index: -1;
+      pointer-events: none;
+    }
+    html { background: transparent; }
+    .app-shell {
+      position: relative;
+      z-index: 1;
     }
     header {
       display: flex;
@@ -37,7 +54,8 @@
       gap: 12px;
       padding: 16px 20px;
       border-bottom: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.96);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(2px);
     }
     header h1 {
       margin: 0;
@@ -85,6 +103,7 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 14px 16px;
+      backdrop-filter: blur(2px);
     }
     .panel h2 {
       margin: 0 0 12px;
@@ -170,21 +189,6 @@
       box-shadow: 0 0 0 1px rgba(21, 128, 61, 0.35);
       overflow: hidden;
     }
-    /* Free Windy embed behind radar overlays (no API key). pointer-events none so canvas stays clickable. */
-    .windy-bg {
-      position: absolute;
-      inset: -8%;
-      width: 116%;
-      height: 116%;
-      border: 0;
-      z-index: 0;
-      pointer-events: none;
-      filter: none;
-      transform: scale(1.02);
-    }
-    .radar-scrim {
-      display: none; /* fully transparent radar — Windy is the background */
-    }
     canvas#radar {
       position: absolute;
       inset: 0;
@@ -215,9 +219,12 @@
     }
     .windy-credit {
       font-size: 0.68rem;
-      color: var(--muted);
+      color: var(--text);
       text-align: center;
       margin: 0;
+      background: rgba(255, 255, 255, 0.88);
+      border-radius: 8px;
+      padding: 4px 10px;
     }
     .windy-credit a { color: #1a5fb4; }
     .legend {
@@ -225,8 +232,12 @@
       flex-wrap: wrap;
       gap: 12px 18px;
       font-size: 0.75rem;
-      color: var(--muted);
+      color: var(--text);
       justify-content: center;
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
     }
     .legend i {
       display: inline-block;
@@ -271,7 +282,7 @@
     }
     .test-banner {
       display: none;
-      background: #ffe8e8;
+      background: rgba(255, 232, 232, 0.92);
       color: #8b1515;
       text-align: center;
       padding: 8px;
@@ -283,8 +294,9 @@
     footer {
       text-align: center;
       font-size: 0.7rem;
-      color: #5a6b7d;
+      color: #142033;
       padding: 12px 16px 24px;
+      background: rgba(255, 255, 255, 0.72);
     }
     footer a { color: #1a5fb4; }
 
@@ -296,7 +308,8 @@
       gap: 10px;
       padding: 12px 20px;
       border-bottom: 1px solid var(--border);
-      background: #ffffff;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(2px);
       font-size: 0.9rem;
     }
     .whz-banner .level {
@@ -427,6 +440,17 @@
   </style>
 </head>
 <body>
+  <iframe
+    id="windyBg"
+    class="windy-page-bg"
+    title="Windy wind map (full-page background)"
+    loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade"
+    sandbox="allow-scripts"
+    allowfullscreen
+    src="https://embed.windy.com/embed2.html?lat=53.42&lon=-117.50&detailLat=53.42&detailLon=-117.50&zoom=6&level=surface&overlay=wind&product=ecmwf&menu=&message=false&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1"
+  ></iframe>
+  <div class="app-shell">
   <div id="testBanner" class="test-banner">TEST DATA MODE — sample fires only (not live AB/BC wildfire feeds)</div>
   
   <div id="whzBanner" class="whz-banner" role="status" aria-live="polite">
@@ -484,21 +508,10 @@
     <section class="radar-wrap panel">
       <h2 style="align-self:flex-start">Radar · 150 km sweep</h2>
       <div class="radar-frame">
-        <iframe
-          id="windyBg"
-          class="windy-bg"
-          title="Windy wind overlay (background)"
-          loading="lazy"
-          referrerpolicy="no-referrer-when-downgrade"
-          sandbox="allow-scripts"
-          allowfullscreen
-          src="https://embed.windy.com/embed2.html?lat=53.42&lon=-117.50&detailLat=53.42&detailLon=-117.50&zoom=7&level=surface&overlay=wind&product=ecmwf&menu=&message=false&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=default&metricTemp=default&radarRange=-1"
-        ></iframe>
-        <div class="radar-scrim" aria-hidden="true"></div>
         <canvas id="radar" width="720" height="720" aria-label="Wildfire radar"></canvas>
         <div class="camp-label" id="campLabel">TEST pin — outside Hinton, AB</div>
       </div>
-      <p class="windy-credit">Wind background: free <a href="https://www.windy.com/" target="_blank" rel="noopener">Windy</a> embed (no API key). Interactive Map Forecast API not used.</p>
+      <p class="windy-credit">Full-page wind background: free <a href="https://www.windy.com/" target="_blank" rel="noopener">Windy</a> embed (no API key). Interactive Map Forecast API not used.</p>
       <div class="legend">
         <span><i style="background:#15803d"></i>TEST pin (not a real camp)</span>
         <span><i style="background:#b91c1c"></i>Out of Control</span>
@@ -1030,7 +1043,7 @@
       lon: String(lon),
       detailLat: String(lat),
       detailLon: String(lon),
-      zoom: "7",
+      zoom: "6",
       level: "surface",
       overlay: "wind",
       product: "ecmwf",
@@ -1471,5 +1484,6 @@
   };
 })();
   </script>
+  </div><!-- .app-shell -->
 </body>
 </html>
