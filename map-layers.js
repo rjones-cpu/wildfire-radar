@@ -4,7 +4,8 @@
  * - ECCC GeoMet: commercial use allowed; attribution "Data Source: Environment and Climate Change Canada";
  *   no bulk tile scraping; contact if ≥86,400 req/day.
  * - NASA GIBS: required acknowledgment; no NASA endorsement implied.
- * UI default (Ralph 2026-10-31): GIBS true-colour satellite + RDPS wind arrows (WINDARROWKMH).
+ * UI default (Ralph 2026-11-01): Google Maps hybrid basemap + RDPS wind arrows (WINDARROWKMH).
+ * Optional GIBS smoke overlay (off by default). GIBS true-colour base is NOT used by the page.
  * HRDPS WindSpeed / WDIR colour washes are NOT loaded in the page.
  */
 (function (g) {

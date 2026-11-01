@@ -169,7 +169,8 @@ const panelBlack2 = compositeWhiteOver(0.88, "#000000");
 assert(contrastRatio("#b45309", panelBlack2) < 4.5, "graphic Held #b45309 would fail as panel text (sanity)");
 const indexHtml = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert(indexHtml.includes("statusTextColor(f.FIRE_STATUS)"), "fire list uses statusTextColor");
-assert(indexHtml.indexOf("statusColor(f.FIRE_STATUS)") === indexHtml.lastIndexOf("statusColor(f.FIRE_STATUS)"), "statusColor only used once (radar markers)");
+const scCount = (indexHtml.match(/statusColor\(f\.FIRE_STATUS\)/g) || []).length;
+assert(scCount === 2, "statusColor used for radar markers + Google fire markers (got " + scCount + ")");
 assert(/const col = statusColor\(f\.FIRE_STATUS\)/.test(indexHtml), "radar markers still use statusColor");
 
 
@@ -207,12 +208,14 @@ const parsed = MAP_LAYERS.parseEcccDefaultTime('<Dimension name="time" units="IS
 assert(parsed === "2026-11-01T01:00:00Z", "parseEcccDefaultTime");
 const indexHtmlMap = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert(indexHtmlMap.indexOf("embed.windy.com") < 0, "index has no windy embed host");
-assert(indexHtmlMap.indexOf("frame-src 'none'") >= 0 || indexHtmlMap.indexOf('frame-src \'none\'') >= 0, "CSP frame-src none");
-assert(indexHtmlMap.indexOf("geo.weather.gc.ca") >= 0 && indexHtmlMap.indexOf("gibs.earthdata.nasa.gov") >= 0, "CSP/map hosts present");
+assert(indexHtmlMap.indexOf("frame-src https://*.google.com") >= 0 || indexHtmlMap.indexOf("frame-src https://*.google.com") >= 0, "CSP frame-src google for Maps");
+assert(indexHtmlMap.indexOf("geo.weather.gc.ca") >= 0 && indexHtmlMap.indexOf("gibs.earthdata.nasa.gov") >= 0, "CSP still allows ECCC + GIBS smoke");
+assert(indexHtmlMap.indexOf("maps.googleapis.com") >= 0, "CSP allows maps.googleapis.com");
 assert(indexHtmlMap.indexOf("statusTextColor(f.FIRE_STATUS)") >= 0, "fire list still statusTextColor");
 assert(indexHtmlMap.indexOf("Data Source: Environment and Climate Change Canada") >= 0, "ECCC attribution");
 
-assert(indexHtmlMap.toLowerCase().indexOf("not endorsed by nasa") >= 0, "NASA non-endorsement");
+assert(indexHtmlMap.toLowerCase().indexOf("not endorsed by nasa") >= 0, "NASA non-endorsement (smoke)");
+assert(indexHtmlMap.indexOf("Google Maps") >= 0, "Google Maps credited");
 
 // --- UI trim (Ralph): no camp-location widget / site plan panel ---
 assert(indexHtmlMap.indexOf("Camp location") < 0, "no Camp location widget heading");
@@ -227,16 +230,31 @@ assert(indexHtmlMap.indexOf("function setCamp") >= 0, "setCamp present");
 
 assert(indexHtmlMap.indexOf("togSmoke") >= 0 && indexHtmlMap.indexOf("MAP_LAYERS") >= 0, "smoke toggle / map layers kept");
 
-// --- Satellite + wind direction only (no WindSpeed colour wash) ---
+// --- Google Maps hybrid + wind arrows (no GIBS true-colour base / no WindSpeed wash) ---
 assert(indexHtmlMap.indexOf("bgWindSpeed") < 0, "no bgWindSpeed element");
 assert(indexHtmlMap.indexOf("buildEcccWindSpeedUrl") < 0, "page does not load WindSpeed URL");
+assert(indexHtmlMap.indexOf("buildGibsBaseUrl") < 0, "page does not load GIBS true-colour base");
+assert(indexHtmlMap.indexOf("bgBase") < 0 && indexHtmlMap.indexOf("bgGoogleMap") >= 0, "Google Map div replaces GIBS base img");
 assert(indexHtmlMap.indexOf("WINDSPEEDKMH") < 0, "no WINDSPEEDKMH in page");
 assert(indexHtmlMap.indexOf("WDIR6") < 0 && indexHtmlMap.indexOf("HRDPS-WEonG_2.5km_WindDir") < 0, "no WDIR6 colour style in page");
 assert(indexHtmlMap.indexOf("bgWindDir") >= 0 && indexHtmlMap.indexOf("buildEcccWindDirUrl") >= 0, "WindDir layer kept");
 assert(indexHtmlMap.indexOf("Wind direction (ECCC RDPS arrows)") >= 0, "wind toggle labeled RDPS arrows");
 assert(/<input type="checkbox" id="togSmoke"[^>]*>/.test(indexHtmlMap) && !/<input type="checkbox" id="togSmoke"[^>]*\bchecked\b/.test(indexHtmlMap), "smoke off by default");
 assert(/<input type="checkbox" id="togWind"[^>]*\bchecked\b/.test(indexHtmlMap), "wind direction on by default");
-assert(indexHtmlMap.indexOf("img-src 'self' data: https://geo.weather.gc.ca https://gibs.earthdata.nasa.gov") >= 0, "CSP img-src hosts unchanged");
+assert(indexHtmlMap.indexOf("maps-config.js") >= 0, "maps-config script included");
+assert(indexHtmlMap.indexOf("loading=async") >= 0, "Maps JS loading=async");
+assert(indexHtmlMap.indexOf("gm_authFailure") >= 0 && indexHtmlMap.indexOf("mapFallback") >= 0, "Maps auth failure + fallback UI");
+assert(indexHtmlMap.indexOf("syncGoogleMarkers") >= 0, "camp/fire markers sync");
+const mapsCfg = fs.readFileSync(path.join(root, "maps-config.js"), "utf8");
+assert(/apiKey\s*:/.test(mapsCfg) && mapsCfg.indexOf("AIza") >= 0, "maps-config has apiKey");
+assert(mapsCfg.indexOf("referrer-restricted") >= 0 || mapsCfg.indexOf("rjones-cpu.github.io") >= 0, "maps-config notes referrer restriction");
+const gl = fs.readFileSync(path.join(root, ".gitleaks.toml"), "utf8");
+assert(gl.indexOf("maps-config") >= 0 && gl.toLowerCase().indexOf("referrer") >= 0, "gitleaks allowlists browser Maps key");
+assert(indexHtmlMap.indexOf("https://*.googleapis.com") >= 0 && indexHtmlMap.indexOf("https://*.gstatic.com") >= 0, "CSP img-src includes Google tile hosts");
+assert(indexHtmlMap.indexOf("geo.weather.gc.ca") >= 0 && indexHtmlMap.indexOf("gibs.earthdata.nasa.gov") >= 0, "CSP img-src keeps ECCC + GIBS");
+assert(indexHtmlMap.indexOf("maps.googleapis.com") >= 0, "CSP script/connect allows maps.googleapis.com");
+assert(indexHtmlMap.indexOf("worker-src blob:") >= 0, "CSP worker-src blob for Maps");
+assert(indexHtmlMap.indexOf("fonts.gstatic.com") >= 0, "CSP font-src fonts.gstatic.com");
 
 // --- Open Government licences + disclaimer ---
 assert(indexHtmlMap.indexOf("open-government-licence-bc") >= 0, "BC OGL link");

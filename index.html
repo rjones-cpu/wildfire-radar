@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://geo.weather.gc.ca https://gibs.earthdata.nasa.gov; font-src 'self' data:; connect-src 'self' https://geospatial.alberta.ca https://services6.arcgis.com https://geo.weather.gc.ca https://gibs.earthdata.nasa.gov; frame-src 'none'; worker-src 'none'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://maps.googleapis.com https://maps.gstatic.com; img-src 'self' data: blob: https://geo.weather.gc.ca https://gibs.earthdata.nasa.gov https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com https://*.ggpht.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://geospatial.alberta.ca https://services6.arcgis.com https://geo.weather.gc.ca https://gibs.earthdata.nasa.gov https://maps.googleapis.com https://*.googleapis.com https://*.gstatic.com; frame-src https://*.google.com; worker-src blob:; form-action 'none'" />
   <title>LodgeX Wildfire Preparedness · Radar</title>
   <style>
     :root {
@@ -33,7 +33,7 @@
       position: relative;
       z-index: 1;
     }
-    /* Full-viewport ECCC + NASA GIBS map behind all UI (Ralph). */
+    /* Full-viewport Google Maps (hybrid) + ECCC wind arrows behind UI (Ralph). */
     html { background: #0b1220; }
     .bg-map {
       position: fixed;
@@ -45,6 +45,13 @@
       overflow: hidden;
       background: #0b1220;
     }
+    .bg-map #bgGoogleMap {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
     .bg-map img {
       position: absolute;
       inset: 0;
@@ -53,15 +60,30 @@
       object-fit: cover;
       display: block;
     }
-    .bg-map img#bgBase { opacity: 1; z-index: 0; } /* NASA GIBS true-colour satellite */
     .bg-map img#bgWindDir {
       opacity: 1;
       z-index: 2;
-      /* Halo so WDIR arrows stay readable on bright/dark satellite land */
+      /* Halo so arrows stay readable on hybrid imagery */
       filter: drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 1.2px #fff) drop-shadow(0 1px 1px rgba(0,0,0,0.55));
     }
     .bg-map img#bgSmoke { opacity: 0.55; z-index: 3; }
     .bg-map img.is-off { display: none; }
+    .map-fallback {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: #0b1220;
+      color: #e2e8f0;
+      text-align: center;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .map-fallback.show { display: flex; }
+    .map-fallback strong { color: #f8fafc; }
     .map-controls {
       position: fixed;
       left: 12px;
@@ -390,7 +412,15 @@
 </head>
 <body>
   <div id="bgMap" class="bg-map" aria-hidden="true">
-    <img id="bgBase" alt="" decoding="async" />
+    <div id="bgGoogleMap" role="presentation"></div>
+    <div id="mapFallback" class="map-fallback" role="status">
+      <div>
+        <strong>Google Maps could not load</strong><br/>
+        The background map needs a valid Maps JavaScript API key with this page’s referrer allowed
+        (production: <code>https://rjones-cpu.github.io/*</code>). Localhost often shows a billing or referrer error.
+        Wind / smoke overlays and the radar still work without the map tiles.
+      </div>
+    </div>
     <img id="bgWindDir" alt="" decoding="async" />
     <img id="bgSmoke" class="is-off" alt="" decoding="async" />
   </div>
@@ -439,7 +469,7 @@
         <canvas id="radar" width="720" height="720" aria-label="Wildfire radar"></canvas>
         <div class="camp-label" id="campLabel">TEST pin — outside Hinton, AB</div>
       </div>
-      <p class="map-credit">Background: NASA GIBS true-colour satellite + ECCC RDPS wind arrows (no wind-speed / WDIR colour wash). See footer for licences.</p>
+      <p class="map-credit">Background: Google Maps hybrid + ECCC RDPS wind arrows (smoke optional). Google logo/attribution appears on the map. See footer for licences.</p>
       <div class="legend">
         <span><i style="background:#15803d"></i>TEST pin (not a real camp)</span>
         <span><i style="background:#b91c1c"></i>Out of Control</span>
@@ -458,11 +488,11 @@
       <a href="https://geospatial.alberta.ca/mimas/rest/services/wildfire/alberta_fire_status_by_category_group/FeatureServer/0" target="_blank" rel="noopener">AB Active Wildfire Locations</a>
       · Data © Province of British Columbia / BC Wildfire Service ·
       <a href="https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0" target="_blank" rel="noopener">BCWS ActiveFires PublicView</a>
-      · Map: <strong>Data Source: Environment and Climate Change Canada</strong>
-      (<a href="https://geo.weather.gc.ca/geomet" target="_blank" rel="noopener">MSC GeoMet</a> RDPS wind arrows; commercial use permitted; no bulk tile scraping; contact if ≥86,400 req/day)
-      · Imagery from NASA’s <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs" target="_blank" rel="noopener">Global Imagery Browse Services (GIBS)</a>, part of NASA’s Earth Science Data and Information System (ESDIS).
-      We acknowledge the use of imagery provided by services from NASA’s GIBS. This product is not endorsed by NASA.
-      · Prototype / local only · WHZ thresholds from site plan extract (<code>plan-data.js</code>) · Fire feeds refresh 5 min · Map layers 30 min
+      · Background map: <strong>Google Maps</strong> (Maps JavaScript API; Google’s own logo and attribution appear on the map).
+      · Wind arrows: <strong>Data Source: Environment and Climate Change Canada</strong>
+      (<a href="https://geo.weather.gc.ca/geomet" target="_blank" rel="noopener">MSC GeoMet</a> RDPS; commercial use permitted; no bulk tile scraping; contact if ≥86,400 req/day)
+      · Optional smoke overlay: imagery from NASA’s <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs" target="_blank" rel="noopener">Global Imagery Browse Services (GIBS)</a> / ESDIS. We acknowledge NASA GIBS. This product is not endorsed by NASA.
+      · Prototype · WHZ thresholds from site plan extract (<code>plan-data.js</code>) · Fire feeds refresh 5 min · Map overlays 30 min
     </p>
     <div class="licence-block">
       <p>Contains information licensed under the <a href="https://www2.gov.bc.ca/gov/content/data/policy-standards/data-policies/open-data/open-government-licence-bc" target="_blank" rel="noopener">Open Government Licence – British Columbia</a>.</p>
@@ -475,6 +505,7 @@
 
   <script src="radar-security.js"></script>
   <script src="map-layers.js"></script>
+  <script src="maps-config.js"></script>
   <script src="plan-data.js"></script>
   <script>
 (function () {
@@ -793,12 +824,18 @@
     };
   }
 
-  /** ECCC + NASA GIBS full-page background (GetMap images; light refresh). */
+  /** Google Maps hybrid background + ECCC wind / optional GIBS smoke overlays. */
   const ML = window.MAP_LAYERS;
   let ecccTime = null;
   let mapLoadGen = 0;
+  let gmap = null;
+  let gmapReady = false;
+  let gmapFailed = false;
+  let campMarker = null;
+  let fireMarkers = [];
   const elBg = {
-    base: document.getElementById("bgBase"),
+    gmapEl: document.getElementById("bgGoogleMap"),
+    fallback: document.getElementById("mapFallback"),
     windDir: document.getElementById("bgWindDir"),
     smoke: document.getElementById("bgSmoke"),
     togWind: document.getElementById("togWind"),
@@ -806,10 +843,35 @@
     stamp: document.getElementById("mapTimestamp"),
   };
 
+  function showMapFallback(reason) {
+    gmapFailed = true;
+    if (elBg.fallback) {
+      elBg.fallback.classList.add("show");
+      const detail = reason ? (" " + String(reason)) : "";
+      elBg.fallback.querySelector("div").innerHTML =
+        "<strong>Google Maps could not load</strong><br/>" +
+        "The background map needs a valid Maps JavaScript API key with this page’s referrer allowed " +
+        "(production: <code>https://rjones-cpu.github.io/*</code>). Localhost often shows a billing or referrer error." +
+        detail +
+        "<br/>Wind / smoke overlays and the radar still work without the map tiles.";
+    }
+    if (elBg.stamp) elBg.stamp.textContent = "Google Maps unavailable · overlays only";
+  }
+
   function mapPixelSize() {
     const w = ML.clampMapSize(window.innerWidth || 1024);
     const h = ML.clampMapSize(window.innerHeight || 768);
     return { w: w, h: h };
+  }
+
+  /** Zoom so ~DEFAULT_RADIUS_KM fills most of the shorter viewport side. */
+  function zoomForRadiusKm(lat, radiusKm) {
+    const r = radiusKm || (ML && ML.DEFAULT_RADIUS_KM) || 160;
+    const h = Math.max(window.innerHeight || 768, 400);
+    const metersPerPx = (r * 2000) / h;
+    const latRad = (lat * Math.PI) / 180;
+    const zoom = Math.log2((156543.03392 * Math.cos(latRad)) / metersPerPx);
+    return Math.max(4, Math.min(12, Math.round(zoom)));
   }
 
   function applyLayerVisibility() {
@@ -832,6 +894,131 @@
     return ecccTime;
   }
 
+  function syncGoogleMarkers() {
+    if (!gmapReady || !gmap || !window.google || !google.maps) return;
+    const pos = { lat: camp.lat, lng: camp.lon };
+    if (!campMarker) {
+      campMarker = new google.maps.Marker({
+        map: gmap,
+        position: pos,
+        title: camp.name,
+        zIndex: 1000,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 7,
+          fillColor: "#15803d",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
+        },
+      });
+    } else {
+      campMarker.setPosition(pos);
+      campMarker.setTitle(camp.name);
+    }
+    fireMarkers.forEach((m) => m.setMap(null));
+    fireMarkers = [];
+    near.forEach((f) => {
+      const col = statusColor(f.FIRE_STATUS);
+      fireMarkers.push(
+        new google.maps.Marker({
+          map: gmap,
+          position: { lat: f.lat, lng: f.lon },
+          title: (f.SOURCE ? f.SOURCE + " " : "") + (f.FIRE_NUMBER || f.LABEL || "fire"),
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 5,
+            fillColor: col,
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 1.5,
+          },
+        })
+      );
+    });
+  }
+
+  function centerGoogleMap(lat, lon) {
+    if (!gmapReady || !gmap) return;
+    const z = zoomForRadiusKm(lat, ML && ML.DEFAULT_RADIUS_KM);
+    gmap.setCenter({ lat: lat, lng: lon });
+    gmap.setZoom(z);
+    syncGoogleMarkers();
+  }
+
+  function initGoogleMapInstance() {
+    if (!elBg.gmapEl || !window.google || !google.maps) {
+      showMapFallback("(Maps API missing)");
+      return;
+    }
+    try {
+      const type =
+        (window.MAPS_CONFIG && window.MAPS_CONFIG.defaultMapType) || "hybrid";
+      gmap = new google.maps.Map(elBg.gmapEl, {
+        center: { lat: camp.lat, lng: camp.lon },
+        zoom: zoomForRadiusKm(camp.lat, ML && ML.DEFAULT_RADIUS_KM),
+        mapTypeId: type === "satellite" ? "satellite" : "hybrid",
+        disableDefaultUI: true,
+        gestureHandling: "none",
+        keyboardShortcuts: false,
+        clickableIcons: false,
+        draggable: false,
+        scrollwheel: false,
+        disableDoubleClickZoom: true,
+        // Keep Google logo + Map Data attribution visible (required).
+        fullscreenControl: false,
+        streetViewControl: false,
+        mapTypeControl: false,
+        zoomControl: false,
+        backgroundColor: "#0b1220",
+      });
+      gmapReady = true;
+      if (elBg.fallback) elBg.fallback.classList.remove("show");
+      syncGoogleMarkers();
+    } catch (err) {
+      showMapFallback("(init error)");
+    }
+  }
+
+  window.__onGoogleMapsReady = function () {
+    initGoogleMapInstance();
+    updateBackgroundMap(camp.lat, camp.lon);
+  };
+
+  window.gm_authFailure = function () {
+    gmapReady = false;
+    gmap = null;
+    showMapFallback("(Maps auth / billing / referrer rejected this origin)");
+  };
+
+  function loadGoogleMapsScript() {
+    const cfg = window.MAPS_CONFIG || {};
+    const key = cfg.apiKey;
+    if (!key) {
+      showMapFallback("(maps-config.js apiKey missing)");
+      return;
+    }
+    if (window.google && google.maps) {
+      window.__onGoogleMapsReady();
+      return;
+    }
+    const s = document.createElement("script");
+    s.async = true;
+    s.defer = true;
+    s.src =
+      "https://maps.googleapis.com/maps/api/js?key=" +
+      encodeURIComponent(key) +
+      "&loading=async&callback=__onGoogleMapsReady";
+    s.onerror = function () {
+      showMapFallback("(script network error)");
+    };
+    document.head.appendChild(s);
+    // If callback never fires (blocked), surface fallback after a grace period.
+    setTimeout(function () {
+      if (!gmapReady && !gmapFailed) showMapFallback("(timed out waiting for Maps)");
+    }, 12000);
+  }
+
   async function updateBackgroundMap(lat, lon) {
     if (!ML || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
     const gen = ++mapLoadGen;
@@ -842,18 +1029,25 @@
     if (gen !== mapLoadGen) return;
     const windTime = ecccTime || undefined;
     const common = { lat: lat, lon: lon, bbox: bbox, width: sz.w, height: sz.h };
-    const baseUrl = ML.buildGibsBaseUrl(Object.assign({}, common, { time: gibsDay }));
+    // GIBS true-colour base removed — Google Maps is the basemap.
     const windDirUrl = ML.buildEcccWindDirUrl(Object.assign({}, common, { time: windTime }));
     const smokeUrl = ML.buildGibsSmokeUrl(Object.assign({}, common, { time: gibsDay }));
-    if (elBg.base) elBg.base.src = baseUrl;
     if (elBg.windDir) elBg.windDir.src = windDirUrl;
     if (elBg.smoke) elBg.smoke.src = smokeUrl;
     applyLayerVisibility();
+    centerGoogleMap(lat, lon);
     if (elBg.stamp) {
       const windLabel = windTime ? windTime.replace("T", " ").replace(/:00Z$/, "Z") : "—";
+      const mapLabel = gmapReady ? "Google Maps hybrid" : gmapFailed ? "Maps unavailable" : "Maps loading…";
       elBg.stamp.textContent =
-        "Satellite (GIBS): " + gibsDay + " UTC · Wind arrows (ECCC RDPS): " + windLabel +
-        " · ~" + ML.DEFAULT_RADIUS_KM + " km extent";
+        mapLabel +
+        " · Wind arrows (ECCC RDPS): " +
+        windLabel +
+        " · Smoke (GIBS): " +
+        gibsDay +
+        " UTC · ~" +
+        ML.DEFAULT_RADIUS_KM +
+        " km extent";
     }
   }
 
@@ -862,8 +1056,14 @@
   let mapResizeTimer = null;
   window.addEventListener("resize", () => {
     clearTimeout(mapResizeTimer);
-    mapResizeTimer = setTimeout(() => updateBackgroundMap(camp.lat, camp.lon), 400);
+    mapResizeTimer = setTimeout(() => {
+      if (gmapReady && gmap && google.maps && google.maps.event) {
+        google.maps.event.trigger(gmap, "resize");
+      }
+      updateBackgroundMap(camp.lat, camp.lon);
+    }, 400);
   });
+  loadGoogleMapsScript();
 
   function recomputeNear() {
     near = fires
@@ -878,6 +1078,7 @@
       .sort((a, b) => a.dist - b.dist);
     el.nearCount.textContent = String(near.length);
     updateWhzUi();
+    syncGoogleMarkers();
   }
 
   function renderList() {
@@ -1247,9 +1448,12 @@
       map: {
         ecccTime,
         gibsDate: ML ? ML.gibsDateUTC() : null,
+        googleReady: gmapReady,
+        googleFailed: gmapFailed,
         wind: !!(elBg.togWind && elBg.togWind.checked),
         smoke: !!(elBg.togSmoke && elBg.togSmoke.checked),
         layers: ML ? ML.LAYERS : null,
+        basemap: "google-maps-hybrid",
       },
     }),
     fetchFires,

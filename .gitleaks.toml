@@ -1,0 +1,10 @@
+# Allowlist: maps-config.js holds a Maps JavaScript API *browser* key
+# restricted by HTTP referrer to https://rjones-cpu.github.io/* (Maps JS API only).
+# Not a server secret; client-side embed is intentional for GitHub Pages.
+title = "wildfire-radar"
+
+[[allowlists]]
+description = "Google Maps JS API browser key (referrer-restricted to rjones-cpu.github.io)"
+paths = [
+  '''maps-config\.js$''',
+]

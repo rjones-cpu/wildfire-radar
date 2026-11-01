@@ -22,20 +22,21 @@ python3 -m http.server 8765
 
 Each ping is tagged **AB** or **BC**. Feeds load in parallel; one failure keeps the other. Same 150 km range and WHZ plan triggers apply to the nearest fire of either province.
 
-## Background map (satellite + wind direction)
+## Background map (Google Maps + wind / smoke)
 
-Full-page map behind the transparent radar (no third-party wind embed). Default view is **NASA GIBS true-colour satellite land** with **ECCC RDPS wind arrows** (`WINDARROWKMH`) only — HRDPS WindSpeed / WDIR colour washes are **not** shown (Ralph, 2026-10-31).
+Full-page **Google Maps** hybrid basemap behind the transparent radar (Maps JavaScript API, `loading=async`). Referrer-restricted browser key in `maps-config.js` (allowlisted for gitleaks — not a server secret).
 
-| Layer | Source | Id | Default |
-|-------|--------|----|---------|
-| Basemap (satellite) | NASA GIBS WMS | `MODIS_Terra_CorrectedReflectance_TrueColor` | on |
+| Layer | Source | Id / notes | Default |
+|-------|--------|------------|---------|
+| Basemap | Google Maps JS API | `hybrid` (satellite + labels) | on |
 | Wind direction (arrows) | ECCC MSC GeoMet WMS | `RDPS_10km_Winds_10m` / `WINDARROWKMH` | on (toggle) |
 | Smoke | NASA GIBS WMS | `OMPS_Aerosol_Index` | off (toggle) |
 
-- Endpoints: `https://geo.weather.gc.ca/geomet` · `https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi`
-- **ECCC:** commercial use allowed; attribute **Data Source: Environment and Climate Change Canada**; no bulk tile scraping; contact if at least 86,400 requests/day. This app uses infrequent GetMap images (about 30 min refresh).
-- **GIBS:** acknowledge NASA GIBS / ESDIS; no NASA endorsement implied.
-- URL builders live in `map-layers.js` (`buildEcccWindSpeedUrl` remains for tests but is unused by the page).
+- Google’s logo and map-data attribution render on the map itself (required).
+- If Maps fails to load (billing / referrer), a fallback message is shown; radar + fire feeds + overlays still run.
+- ECCC GeoMet: attribute **Data Source: Environment and Climate Change Canada**; light GetMap refresh (~30 min). HRDPS **WindSpeed** colour wash is **not** shown.
+- GIBS smoke (optional): NASA GIBS acknowledgment; no NASA endorsement.
+- URL builders: `map-layers.js`. Config: `maps-config.js`.
 
 ## Licences and disclaimer
 
