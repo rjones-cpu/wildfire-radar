@@ -33,7 +33,7 @@
       position: relative;
       z-index: 1;
     }
-    /* Full-viewport Google Maps (hybrid) + ECCC wind arrows behind UI (Ralph). */
+    /* Full-viewport Google Maps (hybrid) + ECCC RDPS wind particles behind UI (Ralph). */
     html { background: #0b1220; }
     .bg-map {
       position: fixed;
@@ -60,14 +60,42 @@
       object-fit: cover;
       display: block;
     }
-    .bg-map img#bgWindDir {
-      opacity: 1;
+    .bg-map canvas#bgWindCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
       z-index: 2;
-      /* Halo so arrows stay readable on hybrid imagery */
-      filter: drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 1.2px #fff) drop-shadow(0 1px 1px rgba(0,0,0,0.55));
+      pointer-events: none;
+      opacity: 0.92;
     }
+    .bg-map canvas#bgWindCanvas.is-off { display: none; }
     .bg-map img#bgSmoke { opacity: 0.55; z-index: 3; }
     .bg-map img.is-off { display: none; }
+    .map-controls .wind-forecast {
+      display: block;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    .map-controls .wind-forecast label {
+      display: block;
+      margin: 0 0 4px;
+      cursor: default;
+    }
+    .map-controls input[type="range"] {
+      width: 100%;
+      max-width: 280px;
+      margin: 0;
+      accent-color: #1d4ed8;
+    }
+    .map-controls .wind-status {
+      display: block;
+      color: var(--muted);
+      font-size: 0.68rem;
+      margin-top: 2px;
+    }
+    .map-controls .wind-status.err { color: #9a3412; }
     .map-fallback {
       display: none;
       position: absolute;
@@ -418,15 +446,20 @@
         <strong>Google Maps could not load</strong><br/>
         The background map needs a valid Maps JavaScript API key with this page’s referrer allowed
         (production: <code>https://rjones-cpu.github.io/*</code>). Localhost often shows a billing or referrer error.
-        Wind / smoke overlays and the radar still work without the map tiles.
+        Wind particles / smoke overlays and the radar still work without the map tiles.
       </div>
     </div>
-    <img id="bgWindDir" alt="" decoding="async" />
+    <canvas id="bgWindCanvas" aria-hidden="true"></canvas>
     <img id="bgSmoke" class="is-off" alt="" decoding="async" />
   </div>
   <div class="map-controls" role="group" aria-label="Background map layers">
-    <label><input type="checkbox" id="togWind" checked /> Wind direction (ECCC RDPS arrows)</label>
+    <label><input type="checkbox" id="togWind" checked /> Wind particles (ECCC RDPS forecast)</label>
     <label><input type="checkbox" id="togSmoke" /> Smoke (NASA GIBS)</label>
+    <div class="wind-forecast">
+      <label for="windForecast">Forecast hour: <strong id="windForecastLabel">now</strong></label>
+      <input type="range" id="windForecast" min="0" max="48" step="1" value="0" aria-valuemin="0" aria-valuemax="48" aria-valuenow="0" />
+      <span class="wind-status" id="windStatus">Loading ECCC RDPS wind grid…</span>
+    </div>
     <span class="map-time" id="mapTimestamp">Map layers loading…</span>
   </div>
   <div class="app-shell">
@@ -469,7 +502,7 @@
         <canvas id="radar" width="720" height="720" aria-label="Wildfire radar"></canvas>
         <div class="camp-label" id="campLabel">TEST pin — outside Hinton, AB</div>
       </div>
-      <p class="map-credit">Background: Google Maps hybrid + ECCC RDPS wind arrows (smoke optional). Google logo/attribution appears on the map. See footer for licences.</p>
+      <p class="map-credit">Background: Google Maps hybrid + ECCC RDPS wind particles (forecast slider; smoke optional). Google logo/attribution appears on the map. See footer for licences.</p>
       <div class="legend">
         <span><i style="background:#15803d"></i>TEST pin (not a real camp)</span>
         <span><i style="background:#b91c1c"></i>Out of Control</span>
@@ -489,8 +522,8 @@
       · Data © Province of British Columbia / BC Wildfire Service ·
       <a href="https://services6.arcgis.com/ubm4tcTYICKBpist/arcgis/rest/services/BCWS_ActiveFires_PublicView/FeatureServer/0" target="_blank" rel="noopener">BCWS ActiveFires PublicView</a>
       · Background map: <strong>Google Maps</strong> (Maps JavaScript API; Google’s own logo and attribution appear on the map).
-      · Wind arrows: <strong>Data Source: Environment and Climate Change Canada</strong>
-      (<a href="https://geo.weather.gc.ca/geomet" target="_blank" rel="noopener">MSC GeoMet</a> RDPS; commercial use permitted; no bulk tile scraping; contact if ≥86,400 req/day)
+      · Wind particles: <strong>Data Source: Environment and Climate Change Canada</strong>
+      (<a href="https://geo.weather.gc.ca/geomet" target="_blank" rel="noopener">MSC GeoMet</a> RDPS WCS WindSpeed/WindDir 10&nbsp;m; commercial use permitted; no bulk scraping; contact if ≥86,400 req/day). Model run and valid time shown in the map controls.
       · Optional smoke overlay: imagery from NASA’s <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs" target="_blank" rel="noopener">Global Imagery Browse Services (GIBS)</a> / ESDIS. We acknowledge NASA GIBS. This product is not endorsed by NASA.
       · Prototype · WHZ thresholds from site plan extract (<code>plan-data.js</code>) · Fire feeds refresh 5 min · Map overlays 30 min
     </p>
@@ -505,6 +538,8 @@
 
   <script src="radar-security.js"></script>
   <script src="map-layers.js"></script>
+  <script src="wind-grid.js"></script>
+  <script src="wind-particles.js"></script>
   <script src="maps-config.js"></script>
   <script src="plan-data.js"></script>
   <script>
@@ -824,9 +859,17 @@
     };
   }
 
-  /** Google Maps hybrid background + ECCC wind / optional GIBS smoke overlays. */
+  /** Google Maps hybrid + ECCC RDPS wind particles + optional GIBS smoke. */
   const ML = window.MAP_LAYERS;
+  const WG = window.WIND_GRID;
+  const WP = window.WIND_PARTICLES;
   let ecccTime = null;
+  let ecccRefTime = null;
+  let windTimes = [];
+  let windHourOffset = 0;
+  let windGrid = null;
+  let windField = null;
+  let windLoadGen = 0;
   let mapLoadGen = 0;
   let gmap = null;
   let gmapReady = false;
@@ -836,12 +879,21 @@
   const elBg = {
     gmapEl: document.getElementById("bgGoogleMap"),
     fallback: document.getElementById("mapFallback"),
-    windDir: document.getElementById("bgWindDir"),
+    windCanvas: document.getElementById("bgWindCanvas"),
     smoke: document.getElementById("bgSmoke"),
     togWind: document.getElementById("togWind"),
     togSmoke: document.getElementById("togSmoke"),
     stamp: document.getElementById("mapTimestamp"),
+    forecast: document.getElementById("windForecast"),
+    forecastLabel: document.getElementById("windForecastLabel"),
+    windStatus: document.getElementById("windStatus"),
   };
+
+  function setWindStatus(msg, isErr) {
+    if (!elBg.windStatus) return;
+    elBg.windStatus.textContent = msg;
+    elBg.windStatus.classList.toggle("err", !!isErr);
+  }
 
   function showMapFallback(reason) {
     gmapFailed = true;
@@ -853,9 +905,12 @@
         "The background map needs a valid Maps JavaScript API key with this page’s referrer allowed " +
         "(production: <code>https://rjones-cpu.github.io/*</code>). Localhost often shows a billing or referrer error." +
         detail +
-        "<br/>Wind / smoke overlays and the radar still work without the map tiles.";
+        "<br/>Wind particles / smoke overlays and the radar still work without the map tiles.";
     }
     if (elBg.stamp) elBg.stamp.textContent = "Google Maps unavailable · overlays only";
+    // Particles can still run over the dark fallback using equirectangular projection.
+    ensureWindField();
+    if (windGrid) restartWindAnimation();
   }
 
   function mapPixelSize() {
@@ -874,24 +929,241 @@
     return Math.max(4, Math.min(12, Math.round(zoom)));
   }
 
+  /** Viewport lon/lat bounds for fallback projection (no Google Maps). */
+  function fallbackBounds() {
+    const r = (ML && ML.DEFAULT_RADIUS_KM) || 160;
+    const dLat = r / 111.32;
+    const cos = Math.cos((camp.lat * Math.PI) / 180);
+    const dLon = r / (111.32 * Math.max(cos, 0.2));
+    return {
+      west: camp.lon - dLon,
+      east: camp.lon + dLon,
+      south: camp.lat - dLat,
+      north: camp.lat + dLat,
+    };
+  }
+
+  function projectLonLat(lon, lat) {
+    const w = (elBg.windCanvas && elBg.windCanvas.clientWidth) || window.innerWidth || 1;
+    const h = (elBg.windCanvas && elBg.windCanvas.clientHeight) || window.innerHeight || 1;
+    if (gmapReady && gmap && window.google && google.maps) {
+      try {
+        const proj = gmap.getProjection && gmap.getProjection();
+        const bounds = gmap.getBounds && gmap.getBounds();
+        if (proj && bounds) {
+          const ne = bounds.getNorthEast();
+          const sw = bounds.getSouthWest();
+          const topRight = proj.fromLatLngToPoint(ne);
+          const bottomLeft = proj.fromLatLngToPoint(sw);
+          const world = proj.fromLatLngToPoint(new google.maps.LatLng(lat, lon));
+          if (topRight && bottomLeft && world) {
+            const x =
+              ((world.x - bottomLeft.x) / (topRight.x - bottomLeft.x)) * w;
+            const y =
+              ((world.y - topRight.y) / (bottomLeft.y - topRight.y)) * h;
+            if (Number.isFinite(x) && Number.isFinite(y)) return { x: x, y: y };
+          }
+        }
+        // OverlayView-style container pixel when available
+        const ov = gmap.__radarOverlay;
+        if (ov && ov.getProjection) {
+          const gp = ov.getProjection();
+          if (gp && gp.fromLatLngToContainerPixel) {
+            const pt = gp.fromLatLngToContainerPixel(new google.maps.LatLng(lat, lon));
+            if (pt) return { x: pt.x, y: pt.y };
+          }
+        }
+      } catch (e) { /* fall through */ }
+    }
+    const b = fallbackBounds();
+    const x = ((lon - b.west) / (b.east - b.west)) * w;
+    const y = ((b.north - lat) / (b.north - b.south)) * h;
+    return { x: x, y: y };
+  }
+
+  function unprojectXY(x, y) {
+    const w = (elBg.windCanvas && elBg.windCanvas.clientWidth) || window.innerWidth || 1;
+    const h = (elBg.windCanvas && elBg.windCanvas.clientHeight) || window.innerHeight || 1;
+    if (gmapReady && gmap && window.google && google.maps) {
+      try {
+        const ov = gmap.__radarOverlay;
+        if (ov && ov.getProjection) {
+          const gp = ov.getProjection();
+          if (gp && gp.fromContainerPixelToLatLng) {
+            const ll = gp.fromContainerPixelToLatLng(new google.maps.Point(x, y));
+            if (ll) return { lon: ll.lng(), lat: ll.lat() };
+          }
+        }
+        const proj = gmap.getProjection && gmap.getProjection();
+        const bounds = gmap.getBounds && gmap.getBounds();
+        if (proj && bounds) {
+          const ne = bounds.getNorthEast();
+          const sw = bounds.getSouthWest();
+          const topRight = proj.fromLatLngToPoint(ne);
+          const bottomLeft = proj.fromLatLngToPoint(sw);
+          const wx = bottomLeft.x + (x / w) * (topRight.x - bottomLeft.x);
+          const wy = topRight.y + (y / h) * (bottomLeft.y - topRight.y);
+          const ll = proj.fromPointToLatLng(new google.maps.Point(wx, wy));
+          if (ll) return { lon: ll.lng(), lat: ll.lat() };
+        }
+      } catch (e) { /* fall through */ }
+    }
+    const b = fallbackBounds();
+    return {
+      lon: b.west + (x / w) * (b.east - b.west),
+      lat: b.north - (y / h) * (b.north - b.south),
+    };
+  }
+
+  function ensureWindField() {
+    if (!elBg.windCanvas || !WP || windField) return windField;
+    windField = WP.createParticleField(elBg.windCanvas, {
+      getUv: function (lon, lat) {
+        if (!windGrid || !WG) return null;
+        return WG.sampleUv(windGrid, lon, lat);
+      },
+      project: projectLonLat,
+      unproject: unprojectXY,
+      isVisible: function () {
+        return !!(elBg.togWind && elBg.togWind.checked);
+      },
+    });
+    return windField;
+  }
+
+  function restartWindAnimation() {
+    const f = ensureWindField();
+    if (!f) return;
+    if (!(elBg.togWind && elBg.togWind.checked)) {
+      f.stop();
+      f.clear();
+      return;
+    }
+    if (WP && WP.prefersReducedMotion()) {
+      f.redrawStatic();
+    } else {
+      f.start();
+    }
+  }
+
   function applyLayerVisibility() {
     const windOn = !!(elBg.togWind && elBg.togWind.checked);
     const smokeOn = !!(elBg.togSmoke && elBg.togSmoke.checked);
-    if (elBg.windDir) elBg.windDir.classList.toggle("is-off", !windOn);
+    if (elBg.windCanvas) elBg.windCanvas.classList.toggle("is-off", !windOn);
     if (elBg.smoke) elBg.smoke.classList.toggle("is-off", !smokeOn);
+    if (windOn) restartWindAnimation();
+    else if (windField) {
+      windField.stop();
+      windField.clear();
+    }
   }
 
-  async function refreshEcccTime() {
-    if (!ML) return null;
+  function attachMapsOverlayHelper() {
+    if (!gmapReady || !gmap || !window.google || !google.maps) return;
+    if (gmap.__radarOverlay) return;
+    const Overlay = function () {};
+    Overlay.prototype = new google.maps.OverlayView();
+    Overlay.prototype.onAdd = function () {};
+    Overlay.prototype.draw = function () {};
+    Overlay.prototype.onRemove = function () {};
+    const ov = new Overlay();
+    ov.setMap(gmap);
+    gmap.__radarOverlay = ov;
+    google.maps.event.addListener(gmap, "idle", function () {
+      restartWindAnimation();
+    });
+  }
+
+  async function refreshEcccTimeMeta() {
+    if (!ML || !WG) return null;
     try {
-      const url = ML.buildEcccCapabilitiesUrl(ML.LAYERS.ecccWindDir);
-      const res = await fetch(url, { method: "GET" });
+      const url = ML.buildEcccCapabilitiesUrl(ML.LAYERS.ecccWindSpeed);
+      const res = await fetch(url, { method: "GET", credentials: "omit" });
       if (!res.ok) return ecccTime;
       const xml = await res.text();
-      const t0 = ML.parseEcccDefaultTime(xml);
-      if (t0) ecccTime = t0;
+      const meta = WG.parseTimeDimension(xml);
+      if (meta.defaultTime) ecccTime = meta.defaultTime;
+      if (meta.referenceDefault) ecccRefTime = meta.referenceDefault;
+      if (meta.rangeText && meta.defaultTime) {
+        windTimes = WG.expandHourlyTimeRange(meta.rangeText, meta.defaultTime, 48);
+      }
+      if (!windTimes.length && ecccTime) windTimes = [ecccTime];
+      if (elBg.forecast) {
+        elBg.forecast.max = String(Math.max(0, windTimes.length - 1));
+        elBg.forecast.setAttribute("aria-valuemax", elBg.forecast.max);
+      }
     } catch (e) { /* keep prior */ }
     return ecccTime;
+  }
+
+  function selectedWindTime() {
+    if (windTimes.length) {
+      const idx = Math.max(0, Math.min(windHourOffset, windTimes.length - 1));
+      return windTimes[idx];
+    }
+    return ecccTime;
+  }
+
+  function updateForecastLabel() {
+    const t = selectedWindTime();
+    const label = t ? t.replace("T", " ").replace(/:00Z$/, " Z") : "—";
+    const hours =
+      windTimes.length && ecccTime
+        ? Math.round((Date.parse(t) - Date.parse(ecccTime)) / 3600000)
+        : windHourOffset;
+    if (elBg.forecastLabel) {
+      elBg.forecastLabel.textContent =
+        (hours <= 0 ? "now" : "+" + hours + " h") + " · valid " + label;
+    }
+    if (elBg.forecast) {
+      elBg.forecast.setAttribute("aria-valuenow", String(windHourOffset));
+      elBg.forecast.value = String(windHourOffset);
+    }
+  }
+
+  async function loadWindGrid(lat, lon) {
+    if (!WG || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const gen = ++windLoadGen;
+    setWindStatus("Loading ECCC RDPS wind grid…", false);
+    try {
+      await refreshEcccTimeMeta();
+      if (gen !== windLoadGen) return;
+      const time = selectedWindTime();
+      updateForecastLabel();
+      const grid = await WG.fetchRdpsUvGrid({
+        lat: lat,
+        lon: lon,
+        radiusKm: (ML && ML.DEFAULT_RADIUS_KM) || 160,
+        time: time,
+        size: 28,
+      });
+      if (gen !== windLoadGen) return;
+      grid.time = time;
+      grid.referenceTime = ecccRefTime;
+      windGrid = grid;
+      const runLabel = ecccRefTime
+        ? ecccRefTime.replace("T", " ").replace(/:00Z$/, " Z")
+        : "—";
+      const validLabel = time
+        ? time.replace("T", " ").replace(/:00Z$/, " Z")
+        : "—";
+      setWindStatus(
+        "ECCC RDPS · run " + runLabel + " · valid " + validLabel + " · particles on",
+        false
+      );
+      restartWindAnimation();
+    } catch (err) {
+      if (gen !== windLoadGen) return;
+      windGrid = null;
+      if (windField) {
+        windField.stop();
+        windField.clear();
+      }
+      setWindStatus(
+        "Wind forecast unavailable — could not load ECCC RDPS grid. Radar and fires still work.",
+        true
+      );
+    }
   }
 
   function syncGoogleMarkers() {
@@ -905,7 +1177,7 @@
         zIndex: 1000,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: 7,
+          scale: 8,
           fillColor: "#15803d",
           fillOpacity: 1,
           strokeColor: "#ffffff",
@@ -927,11 +1199,11 @@
           title: (f.SOURCE ? f.SOURCE + " " : "") + (f.FIRE_NUMBER || f.LABEL || "fire"),
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
-            scale: 5,
+            scale: 10,
             fillColor: col,
             fillOpacity: 1,
             strokeColor: "#ffffff",
-            strokeWeight: 1.5,
+            strokeWeight: 2,
           },
         })
       );
@@ -944,6 +1216,7 @@
     gmap.setCenter({ lat: lat, lng: lon });
     gmap.setZoom(z);
     syncGoogleMarkers();
+    attachMapsOverlayHelper();
   }
 
   function initGoogleMapInstance() {
@@ -975,6 +1248,7 @@
       gmapReady = true;
       if (elBg.fallback) elBg.fallback.classList.remove("show");
       syncGoogleMarkers();
+      attachMapsOverlayHelper();
     } catch (err) {
       showMapFallback("(init error)");
     }
@@ -1013,7 +1287,6 @@
       showMapFallback("(script network error)");
     };
     document.head.appendChild(s);
-    // If callback never fires (blocked), surface fallback after a grace period.
     setTimeout(function () {
       if (!gmapReady && !gmapFailed) showMapFallback("(timed out waiting for Maps)");
     }, 12000);
@@ -1025,24 +1298,26 @@
     const sz = mapPixelSize();
     const bbox = ML.bbox3857Around(lat, lon, ML.DEFAULT_RADIUS_KM);
     const gibsDay = ML.gibsDateUTC();
-    await refreshEcccTime();
-    if (gen !== mapLoadGen) return;
-    const windTime = ecccTime || undefined;
     const common = { lat: lat, lon: lon, bbox: bbox, width: sz.w, height: sz.h };
-    // GIBS true-colour base removed — Google Maps is the basemap.
-    const windDirUrl = ML.buildEcccWindDirUrl(Object.assign({}, common, { time: windTime }));
     const smokeUrl = ML.buildGibsSmokeUrl(Object.assign({}, common, { time: gibsDay }));
-    if (elBg.windDir) elBg.windDir.src = windDirUrl;
     if (elBg.smoke) elBg.smoke.src = smokeUrl;
     applyLayerVisibility();
     centerGoogleMap(lat, lon);
+    await loadWindGrid(lat, lon);
+    if (gen !== mapLoadGen) return;
+    const windTime = selectedWindTime();
     if (elBg.stamp) {
       const windLabel = windTime ? windTime.replace("T", " ").replace(/:00Z$/, "Z") : "—";
+      const runLabel = ecccRefTime
+        ? ecccRefTime.replace("T", " ").replace(/:00Z$/, "Z")
+        : "—";
       const mapLabel = gmapReady ? "Google Maps hybrid" : gmapFailed ? "Maps unavailable" : "Maps loading…";
       elBg.stamp.textContent =
         mapLabel +
-        " · Wind arrows (ECCC RDPS): " +
+        " · Wind particles (ECCC RDPS): valid " +
         windLabel +
+        " · run " +
+        runLabel +
         " · Smoke (GIBS): " +
         gibsDay +
         " UTC · ~" +
@@ -1053,6 +1328,36 @@
 
   if (elBg.togWind) elBg.togWind.addEventListener("change", applyLayerVisibility);
   if (elBg.togSmoke) elBg.togSmoke.addEventListener("change", applyLayerVisibility);
+  let forecastTimer = null;
+  if (elBg.forecast) {
+    elBg.forecast.addEventListener("input", function () {
+      const v = parseInt(elBg.forecast.value, 10);
+      windHourOffset = Number.isFinite(v) ? Math.max(0, Math.min(v, 48)) : 0;
+      updateForecastLabel();
+      clearTimeout(forecastTimer);
+      forecastTimer = setTimeout(function () {
+        loadWindGrid(camp.lat, camp.lon).then(function () {
+          const windTime = selectedWindTime();
+          if (elBg.stamp && ML) {
+            const windLabel = windTime ? windTime.replace("T", " ").replace(/:00Z$/, "Z") : "—";
+            const runLabel = ecccRefTime
+              ? ecccRefTime.replace("T", " ").replace(/:00Z$/, "Z")
+              : "—";
+            const mapLabel = gmapReady ? "Google Maps hybrid" : gmapFailed ? "Maps unavailable" : "Maps loading…";
+            elBg.stamp.textContent =
+              mapLabel +
+              " · Wind particles (ECCC RDPS): valid " +
+              windLabel +
+              " · run " +
+              runLabel +
+              " · ~" +
+              ML.DEFAULT_RADIUS_KM +
+              " km extent";
+          }
+        });
+      }, 280);
+    });
+  }
   let mapResizeTimer = null;
   window.addEventListener("resize", () => {
     clearTimeout(mapResizeTimer);
@@ -1060,9 +1365,11 @@
       if (gmapReady && gmap && google.maps && google.maps.event) {
         google.maps.event.trigger(gmap, "resize");
       }
+      if (windField) windField.resize();
       updateBackgroundMap(camp.lat, camp.lon);
     }, 400);
   });
+  ensureWindField();
   loadGoogleMapsScript();
 
   function recomputeNear() {
@@ -1447,11 +1754,15 @@
       whz: window.computeWhzLevel(near.length ? near[0].dist : null, RADIUS_KM),
       map: {
         ecccTime,
+        ecccRefTime,
+        windValidTime: selectedWindTime(),
+        windHourOffset,
         gibsDate: ML ? ML.gibsDateUTC() : null,
         googleReady: gmapReady,
         googleFailed: gmapFailed,
         wind: !!(elBg.togWind && elBg.togWind.checked),
         smoke: !!(elBg.togSmoke && elBg.togSmoke.checked),
+        windParticles: true,
         layers: ML ? ML.LAYERS : null,
         basemap: "google-maps-hybrid",
       },

@@ -71,6 +71,13 @@ Authority boundary: UI surfaces plan actions; **evacuation order remains with TC
 - Attribution / policy: “Data Source: Environment and Climate Change Canada”; GIBS acknowledgment; no NASA endorsement; no bulk GeoMet scraping; map refresh 30 min.
 - Builders in `map-layers.js`; CSP hosts limited to GeoMet + GIBS (plus AB/BC fire connect-src).
 
+## 6b. Wind particles + Google Maps (Ralph 2026-11-01)
+
+- Basemap switched to **Google Maps hybrid**; GIBS true-colour base removed from the page.
+- Wind **arrow images** (`WINDARROWKMH`) replaced with **Windy-style particle streamlines** from ECCC RDPS WCS AAIGRID (`WindSpeed_10m` + `WindDir_10m`), forecast slider now…+48 h, model run + valid time in UI.
+- **NASA POWER / GEOS-FP not used** for forecast particles (POWER not forecast; GEOS-FP no browser CORS API). GIBS smoke toggle remains optional.
+- New files: `wind-grid.js`, `wind-particles.js`. Fire markers enlarged. Do not push without SOC 2 + Smart Lodge QA on the same SHA.
+
 ---
 
 ## 7. Local run
@@ -87,7 +94,9 @@ python3 -m http.server 8765 --bind 127.0.0.1
 | Path | Role |
 |------|------|
 | `index.html` | UI, dual feeds, radar + ECCC/GIBS map |
-| `map-layers.js` | WMS GetMap URL builders |
+| `map-layers.js` | GIBS/smoke WMS builders + map helpers |
+| `wind-grid.js` | ECCC RDPS WCS AAIGRID parse + UV sample |
+| `wind-particles.js` | Canvas particle animation |
 | `plan-data.js` | Plan extract + `computeWhzLevel` |
 | `DESIGN.md` / `REVIEW.md` / `README.md` | Design, QA notes, runbook |
 | `screenshots/` | Local verification captures |

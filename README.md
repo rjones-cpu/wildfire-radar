@@ -22,22 +22,23 @@ python3 -m http.server 8765
 
 Each ping is tagged **AB** or **BC**. Feeds load in parallel; one failure keeps the other. Same 150 km range and WHZ plan triggers apply to the nearest fire of either province.
 
-## Background map (Google Maps + wind / smoke)
+## Background map (Google Maps + wind particles / smoke)
 
 Full-page **Google Maps** hybrid basemap behind the transparent radar (Maps JavaScript API, `loading=async`). Referrer-restricted browser key in `maps-config.js` (allowlisted for gitleaks — not a server secret).
 
 | Layer | Source | Id / notes | Default |
 |-------|--------|------------|---------|
 | Basemap | Google Maps JS API | `hybrid` (satellite + labels) | on |
-| Wind direction (arrows) | ECCC MSC GeoMet WMS | `RDPS_10km_Winds_10m` / `WINDARROWKMH` | on (toggle) |
+| Wind particles (forecast) | ECCC MSC GeoMet **WCS** AAIGRID | `RDPS_10km_WindSpeed_10m` + `RDPS_10km_WindDir_10m` → UV grid; canvas streamlines (`wind-grid.js` / `wind-particles.js`); forecast slider now…+48 h | on (toggle) |
 | Smoke | NASA GIBS WMS | `OMPS_Aerosol_Index` | off (toggle) |
 
 - Google’s logo and map-data attribution render on the map itself (required).
-- If Maps fails to load (billing / referrer), a fallback message is shown; radar + fire feeds + overlays still run.
-- ECCC GeoMet: attribute **Data Source: Environment and Climate Change Canada**; light GetMap refresh (~30 min). HRDPS **WindSpeed** colour wash is **not** shown.
-- GIBS smoke (optional): NASA GIBS acknowledgment; no NASA endorsement.
-- URL builders: `map-layers.js`. Config: `maps-config.js`.
-- **CSP note (known residual risk):** enabling Google Maps required widening the page CSP (`script-src` includes `'unsafe-eval'` plus `maps.googleapis.com` / `maps.gstatic.com` / `blob:`; `img-src`/`connect-src` allow Google wildcards; `frame-src https://*.google.com`; `worker-src blob:`). Nonce-based strict CSP is not practical on static GitHub Pages (no server to mint nonces per response), so XSS risk is higher than a nonce CSP. Revisit if hosting moves behind a server that can emit nonces.
+- If Maps fails to load (billing / referrer), a fallback message is shown; radar + fire feeds + **wind particles** still run over the dark fallback.
+- ECCC GeoMet: attribute **Data Source: Environment and Climate Change Canada**; show model **run** (`reference_time`) and **valid** TIME in the map controls. Light WCS refresh (~30 min). Legacy WMS **WINDARROWKMH** arrow images and HRDPS WindSpeed colour washes are **not** used.
+- **NASA for forecast wind — not used:** NASA POWER is official and CORS-friendly (`Access-Control-Allow-Origin: *`) but returns **analysis / NRT** hourly series, not a usable multi-day forecast (future hours are fill `-999`). NASA GEOS-FP is download-oriented (NCCS), not a browser CORS forecast API. Optional **GIBS smoke** remains (imagery acknowledgment; no NASA endorsement).
+- No Windy.com or other unofficial wind APIs.
+- URL builders: `map-layers.js` (smoke/GIBS). Wind fetch/parse: `wind-grid.js`. Animation: `wind-particles.js`. Config: `maps-config.js`.
+- **CSP note (known residual risk):** enabling Google Maps required widening the page CSP (`script-src` includes `'unsafe-eval'` plus `maps.googleapis.com` / `maps.gstatic.com` / `blob:`; `img-src`/`connect-src` allow Google wildcards; `frame-src https://*.google.com`; `worker-src blob:`). `connect-src` already allows `https://geo.weather.gc.ca` for WCS. No new `unsafe-*` directives were added for particles. Nonce-based strict CSP is not practical on static GitHub Pages (no server to mint nonces per response), so XSS risk is higher than a nonce CSP. Revisit if hosting moves behind a server that can emit nonces.
 - **gitleaks:** `.gitleaks.toml` uses `[extend] useDefault = true` so default rules stay active, and allowlists only `maps-config.js` (referrer-restricted Maps browser key).
 
 ## Licences and disclaimer
@@ -57,6 +58,8 @@ Full-page **Google Maps** hybrid basemap behind the transparent radar (Maps Java
 ```bash
 node test/whz-escape.test.js
 ```
+
+Includes WHZ/security helpers plus **AAIGRID parse**, **speed/dir → UV**, and **bilinear** sampling tests for the RDPS particle field.
 
 ## Docs
 

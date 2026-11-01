@@ -1,12 +1,13 @@
 /**
- * Background map URL builders — ECCC MSC GeoMet WMS + NASA GIBS WMS.
+ * Background map URL builders — ECCC MSC GeoMet + NASA GIBS WMS (smoke).
  * Licence notes (see DESIGN.md / README):
  * - ECCC GeoMet: commercial use allowed; attribution "Data Source: Environment and Climate Change Canada";
  *   no bulk tile scraping; contact if ≥86,400 req/day.
  * - NASA GIBS: required acknowledgment; no NASA endorsement implied.
- * UI default (Ralph 2026-11-01): Google Maps hybrid basemap + RDPS wind arrows (WINDARROWKMH).
+ * UI default (Ralph 2026-11-01): Google Maps hybrid basemap + RDPS wind *particles*
+ * (WCS WindSpeed_10m + WindDir_10m → UV grid; see wind-grid.js / wind-particles.js).
  * Optional GIBS smoke overlay (off by default). GIBS true-colour base is NOT used by the page.
- * HRDPS WindSpeed / WDIR colour washes are NOT loaded in the page.
+ * Legacy WMS WINDARROWKMH arrow images and HRDPS WindSpeed colour washes are NOT used.
  */
 (function (g) {
   "use strict";
@@ -14,14 +15,13 @@
   var ECCC_WMS = "https://geo.weather.gc.ca/geomet";
   var GIBS_WMS = "https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi";
 
-  /** Verified layer ids (GetCapabilities / GetMap probed 2026-10-31). */
+  /** Verified layer / coverage ids (probed 2026-11-01). */
   var LAYERS = {
-    // WindSpeed colour wash kept as builder-only (not used by the page).
-    ecccWindSpeed: "HRDPS-WEonG_2.5km_WindSpeed",
-    ecccWindSpeedStyle: "WINDSPEEDKMH",
-    // Transparent wind arrows over satellite (WDIR* styles are opaque colour fields).
-    ecccWindDir: "RDPS_10km_Winds_10m",
-    ecccWindDirStyle: "WINDARROWKMH",
+    // WCS coverages used for particle UV field (not WMS arrow images).
+    ecccWindSpeed: "RDPS_10km_WindSpeed_10m",
+    ecccWindDir: "RDPS_10km_WindDir_10m",
+    // Legacy WMS arrow layer id kept only for docs/tests of old GetMap path removal.
+    ecccWindArrowsLegacy: "RDPS_10km_Winds_10m",
     gibsBase: "MODIS_Terra_CorrectedReflectance_TrueColor",
     gibsSmoke: "OMPS_Aerosol_Index",
   };
@@ -29,7 +29,7 @@
   /** Map half-extent ≈ radar 150 km + padding so rings fit. */
   var DEFAULT_RADIUS_KM = 160;
 
-  /** Light refresh — well under ECCC 86,400/day policy. */
+  /** Light refresh — well under ECCC 86,400/day policy (WCS grids, not tile spam). */
   var MAP_REFRESH_MS = 30 * 60 * 1000;
 
   function webMercator(lonDeg, latDeg) {
@@ -91,30 +91,6 @@
     return endpoint + "?" + q.toString();
   }
 
-  function buildEcccWindSpeedUrl(opts) {
-    return buildWmsGetMapUrl(ECCC_WMS, {
-      layers: LAYERS.ecccWindSpeed,
-      styles: LAYERS.ecccWindSpeedStyle,
-      bbox: opts.bbox || bbox3857Around(opts.lat, opts.lon, opts.radiusKm),
-      width: opts.width,
-      height: opts.height,
-      time: opts.time,
-      transparent: true,
-    });
-  }
-
-  function buildEcccWindDirUrl(opts) {
-    return buildWmsGetMapUrl(ECCC_WMS, {
-      layers: LAYERS.ecccWindDir,
-      styles: LAYERS.ecccWindDirStyle,
-      bbox: opts.bbox || bbox3857Around(opts.lat, opts.lon, opts.radiusKm),
-      width: opts.width,
-      height: opts.height,
-      time: opts.time,
-      transparent: true,
-    });
-  }
-
   function buildGibsBaseUrl(opts) {
     return buildWmsGetMapUrl(GIBS_WMS, {
       layers: LAYERS.gibsBase,
@@ -145,7 +121,7 @@
       SERVICE: "WMS",
       VERSION: "1.3.0",
       REQUEST: "GetCapabilities",
-      LAYER: layer || LAYERS.ecccWindDir,
+      LAYER: layer || LAYERS.ecccWindSpeed,
     });
     return ECCC_WMS + "?" + q.toString();
   }
@@ -170,8 +146,6 @@
     clampMapSize: clampMapSize,
     gibsDateUTC: gibsDateUTC,
     buildWmsGetMapUrl: buildWmsGetMapUrl,
-    buildEcccWindSpeedUrl: buildEcccWindSpeedUrl,
-    buildEcccWindDirUrl: buildEcccWindDirUrl,
     buildGibsBaseUrl: buildGibsBaseUrl,
     buildGibsSmokeUrl: buildGibsSmokeUrl,
     buildEcccCapabilitiesUrl: buildEcccCapabilitiesUrl,

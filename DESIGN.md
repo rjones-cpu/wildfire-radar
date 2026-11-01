@@ -13,7 +13,7 @@ Add-on for LodgeX **Smart Lodge** and **CrewSight (Major Projects)**. Prototype 
 - Site plan extract in `plan-data.js` (from `site-specific-plan.docx` / `.pptx`): WHZ distance chart, muster (Road 24 laydown), green/yellow/red routes, evacuation roles, **WILDFIRE RESPONSE CHART ICS role duties (verbatim)**, AQ visibility table, resource list, documented gaps.
 - Live knowledge: Alberta Wildfire FeatureServer layer 0 + BCWS `BCWS_ActiveFires_PublicView` FeatureServer/0 (fire number/label, status, size ha, lat/lon).
 - Explicit non-knowledge: blank forestry phone fields, missing ECC/EOC numbers, blank response-team **names/phones** (duty text exists), plot-plan coordinates, alternate meeting points TBD, CO actions table — listed under Plan gaps, never fabricated.
-- Wind / smoke context: full-page **Google Maps hybrid** basemap + **ECCC RDPS wind arrows** (`RDPS_10km_Winds_10m` / `WINDARROWKMH`). Optional NASA GIBS OMPS smoke (off by default). GIBS true-colour base and HRDPS WindSpeed/WDIR colour washes are not used. Centred on the camp pin (~160 km extent).
+- Wind / smoke context: full-page **Google Maps hybrid** basemap + **ECCC RDPS wind particles** (WCS `RDPS_10km_WindSpeed_10m` + `WindDir_10m` → UV grid; Windy-style canvas streamlines; forecast slider ~48 h). Optional NASA GIBS OMPS smoke (off by default). NASA POWER / GEOS-FP not used for forecast wind (POWER is not forecast; GEOS-FP has no browser API). GIBS true-colour base, WMS arrow images, and HRDPS WindSpeed/WDIR colour washes are not used. Centred on the camp pin (~160 km extent).
 
 ## 3. Tools
 
@@ -23,13 +23,13 @@ Add-on for LodgeX **Smart Lodge** and **CrewSight (Major Projects)**. Prototype 
 | BCWS ActiveFires PublicView query (GeoJSON) | Read-only fetch of active BC fires (`FIRE_STATUS <> 'Out'`) |
 | Haversine + bearing | Distance/bearing from camp pin to each fire |
 | `computeWhzLevel(nearestKm)` | Map distance → Alert / L1 / L2 / L3 per plan chart |
-| ECCC MSC GeoMet WMS (`geo.weather.gc.ca/geomet`) | RDPS **Winds_10m** GetMap (`WINDARROWKMH` arrows); recenters with camp; WindSpeed/WDIR colour washes not shown |
+| ECCC MSC GeoMet WCS (`geo.weather.gc.ca/geomet`) | RDPS **WindSpeed_10m** + **WindDir_10m** AAIGRID → particle UV field (`wind-grid.js`); forecast TIME slider; WMS arrow images not shown |
 | Google Maps JavaScript API | Hybrid basemap (referrer-restricted browser key in `maps-config.js`) |
 | NASA GIBS WMS (`gibs.earthdata.nasa.gov`) | Optional OMPS aerosol index smoke overlay (off by default) |
 | Local UI panels | WHZ banner, fires-within-150 km list, radar; plan detail panels removed from UI |
 | `?test=1` | Offline sample fires for demos/tests (not live feeds) |
 
-No write tools, no SMS/email send. Basemap: Google Maps hybrid. Overlays: ECCC GeoMet wind arrows + optional NASA GIBS smoke. Light overlay refresh (30 min) to respect ECCC usage policy (no bulk scraping; contact if ≥86,400 req/day).
+No write tools, no SMS/email send. Basemap: Google Maps hybrid. Overlays: ECCC GeoMet wind particles + optional NASA GIBS smoke. Light WCS refresh (30 min) to respect ECCC usage policy (no bulk scraping; contact if ≥86,400 req/day).
 
 ## 4. Reasoning and planning
 
@@ -72,8 +72,8 @@ No write tools, no SMS/email send. Basemap: Google Maps hybrid. Overlays: ECCC G
 ## 8. Communication
 
 - UI: WHZ banner (live), fires list + refresh, radar; **no** camp-location widget and **no** site wildfire plan panel.
-- Radar rings at 25 / 50 / 100 / 150 km aligned to WHZ chart + monitor radius; Google Maps hybrid + ECCC wind arrows; smoke toggle (off by default) + timestamp.
-- Footer cites AB + BC fire feeds; Google Maps basemap; **Data Source: Environment and Climate Change Canada** (wind); NASA GIBS acknowledgment for optional smoke (no NASA endorsement).
+- Radar rings at 25 / 50 / 100 / 150 km aligned to WHZ chart + monitor radius; Google Maps hybrid + ECCC wind particles (forecast slider); smoke toggle (off by default) + model run/valid time.
+- Footer cites AB + BC fire feeds; Google Maps basemap; **Data Source: Environment and Climate Change Canada** (RDPS wind particles); NASA GIBS acknowledgment for optional smoke (no NASA endorsement).
 - Human-readable MT timestamps (`America/Edmonton`).
 - Agent-to-agent: status + screenshot paths reported for Ralph’s review; no production blast.
 
